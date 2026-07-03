@@ -16,7 +16,7 @@
     set(k, v) { try { localStorage.setItem("ehub:" + k, JSON.stringify(v)); } catch { } }
   };
 
-  function allProjects() { return PROJECTS.concat(store.get("extraProjects", [])); }
+  function allExploraties() { return EXPLORATIES.concat(store.get("extraExploraties", [])); }
   function getProject(id) { return allProjects().find(p => p.id === id); }
   function person(id) { return PEOPLE.find(p => p.id === id) || PEOPLE[0]; }
   function initials(n) { return n.split(" ").filter(Boolean).map(w => w[0]).slice(0, 2).join("").toUpperCase(); }
@@ -298,9 +298,9 @@
   }
 
   function renderHome() {
-    const orgs = [...new Set(EXPLORATIES.map(e => e.org))].sort();
+    const orgs = [...new Set(allExploraties().map(e => e.org))].sort();
     const statuses = Object.keys(STATUS_COLORS);
-    const jaren = [...new Set(EXPLORATIES.map(e => e.jaar))].sort().reverse();
+    const jaren = [...new Set(allExploraties().map(e => e.jaar))].sort().reverse();
 
     const my = interests();
     const rec = TECHNOLOGIEEN.filter(t => t.labels.some(l => my.includes(l)) || my.includes(t.domein)).slice(0, 10);
@@ -341,7 +341,7 @@
     let activeDomain = "";
 
     function counts() {
-      const filtered = EXPLORATIES.filter(e =>
+      const filtered = allExploraties().filter(e =>
         (!fOrg.value || e.org === fOrg.value) &&
         (!fStatus.value || e.status === fStatus.value) &&
         (!fJaar.value || e.jaar === fJaar.value)
@@ -369,7 +369,7 @@
   /* ---------- Projectkaart ---------- */
 
   function techStats(t) {
-    const expls = EXPLORATIES.filter(e => e.technologieId === t.id);
+    const expls = allExploraties().filter(e => e.technologieId === t.id);
     const orgCount = new Set(expls.map(e => e.org)).size;
     const statuses = [...new Set(expls.map(e => e.status))];
     return { explCount: expls.length, orgCount, statuses };
@@ -403,8 +403,8 @@
   const techState = { q: "", domein: "", org: "", status: "", jaar: "", filterOpen: false, sort: "naam", view: "grid" };
 
   function renderTechnologieen(param, initialDomein) {
-    const orgs = [...new Set(EXPLORATIES.map(e => e.org))].sort();
-    const jaren = [...new Set(EXPLORATIES.map(e => e.jaar))].sort().reverse();
+    const orgs = [...new Set(allExploraties().map(e => e.org))].sort();
+    const jaren = [...new Set(allExploraties().map(e => e.jaar))].sort().reverse();
     if (initialDomein) techState.domein = initialDomein;
 
     shell("technologieen", `
@@ -452,7 +452,7 @@
       let list = TECHNOLOGIEEN.filter(t => {
         const matchesQ = !techState.q || (t.naam + " " + t.korteBeschrijving).toLowerCase().includes(techState.q.toLowerCase());
         const matchesDomein = !techState.domein || t.domein === techState.domein;
-        const explsForTech = EXPLORATIES.filter(e => e.technologieId === t.id);
+        const explsForTech = allExploraties().filter(e => e.technologieId === t.id);
         const matchesOrg = !techState.org || explsForTech.some(e => e.org === techState.org);
         const matchesStatus = !techState.status || explsForTech.some(e => e.status === techState.status);
         const matchesJaar = !techState.jaar || explsForTech.some(e => e.jaar === techState.jaar);
@@ -483,7 +483,7 @@
   function renderTechnologieDetail(id) {
     const t = TECHNOLOGIEEN.find(x => x.id === id);
     if (!t) { location.hash = "#/technologieen"; return; }
-    const expls = EXPLORATIES.filter(e => e.technologieId === t.id);
+    const expls = allExploraties().filter(e => e.technologieId === t.id);
     const similar = TECHNOLOGIEEN.filter(x => x.id !== t.id && (x.domein === t.domein || x.labels.some(l => t.labels.includes(l)))).slice(0, 4);
 
     shell("technologieen", `
@@ -532,39 +532,52 @@
 
   /* ---------- Mijn projecten ---------- */
 
-  const mijnState = { tab: "Alle", q: "" };
+  const mijnState = { q: "", tab: "Alle" };
 
-  function renderMijnProjecten() {
-    const mine = allProjects().filter(p => p.mine);
-    const tabs = ["Alle", "Afgerond", "Lopend", "Gestopt", "On hold", "Concept"];
-    const count = t => t === "Alle" ? mine.length : mine.filter(p => p.status === t).length;
+  function funnelBadge(e) {
+    if (!e.funnel) return "";
+    const fase = e.funnel.huidigeFase;
+    return fase >= 5 ? `<span class="label-chip">Funnel afgerond</span>` : `<span class="label-chip">Fase ${fase} van 5</span>`;
+  }
 
-    shell("mijn-projecten", `
+  function renderMijnExploraties() {
+    const mine = allExploraties().filter(e => e.mine);
+    const tabs = ["Alle", "Onderzoekt", "Pilot", "Opgeschaald", "Gestopt", "Niet opgepakt"];
+    const count = t => t === "Alle" ? mine.length : mine.filter(e => e.status === t).length;
+
+    shell("mijn-exploraties", `
       <div class="page-head">
         <div>
-          <h1 class="page-title">Mijn projecten</h1>
-          <div class="page-sub">Beheer, bekijk en werk verder aan je projecten</div>
+          <h1 class="page-title">Mijn exploraties</h1>
+          <div class="page-sub">Beheer je eigen technologie-exploraties, stap voor stap volgens de Novum-methode</div>
         </div>
-        <a class="btn btn-primary" href="#/nieuw-project">Nieuw project ${I.plus}</a>
+        <a class="btn btn-primary" href="#/nieuwe-exploratie">Nieuwe exploratie ${I.plus}</a>
       </div>
       <div class="toolbar">
         <div class="searchbox">${I.search}<input id="q" placeholder="Zoeken" value="${esc(mijnState.q)}"></div>
       </div>
       <div class="status-tabs" id="stabs">
-        ${tabs.map(t => `<button data-t="${t}" class="${mijnState.tab === t ? "active" : ""}">${t === "Alle" ? "Alle projecten" : t} (${count(t)})</button>`).join("")}
+        ${tabs.map(t => `<button data-t="${esc(t)}" class="${mijnState.tab === t ? "active" : ""}">${t === "Alle" ? "Alle exploraties" : t} (${count(t)})</button>`).join("")}
       </div>
       <div id="results" class="grid"></div>
     `);
 
     function update() {
-      let list = mine.filter(p =>
-        (mijnState.tab === "Alle" || p.status === mijnState.tab) &&
-        (!mijnState.q || (p.title + " " + p.org + " " + p.kort).toLowerCase().includes(mijnState.q.toLowerCase()))
+      let list = mine.filter(e =>
+        (mijnState.tab === "Alle" || e.status === mijnState.tab) &&
+        (!mijnState.q || (e.samenvatting + " " + e.org).toLowerCase().includes(mijnState.q.toLowerCase()))
       );
       document.getElementById("results").innerHTML = list.length
-        ? list.map(p => cardHtml(p, { labels: true })).join("")
-        : `<div class="empty">Geen projecten in deze categorie.</div>`;
-      bindCards();
+        ? list.map(e => {
+            const t = TECHNOLOGIEEN.find(x => x.id === e.technologieId);
+            return `<div class="card">
+              <h3>${esc(t ? t.naam : e.technologieId)} ${funnelBadge(e)}</h3>
+              <div class="org">${esc(e.org)} · <span style="color:${STATUS_COLORS[e.status]}">${esc(e.status)}</span></div>
+              <p>${esc(e.samenvatting || "Nog geen samenvatting — werk de exploratie verder uit.")}</p>
+              <a href="#/nieuwe-exploratie/${esc(e.id)}">Verder werken ${I.pencil}</a>
+            </div>`;
+          }).join("")
+        : `<div class="empty">Geen exploraties in deze categorie.</div>`;
     }
     document.getElementById("stabs").addEventListener("click", e => {
       const b = e.target.closest("button[data-t]"); if (!b) return;
