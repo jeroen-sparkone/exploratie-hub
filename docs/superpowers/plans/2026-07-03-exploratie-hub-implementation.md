@@ -16,7 +16,7 @@
 - Seed dataset: 8-12 real technologies, each with 2-5 real Dutch public-sector organizations exploring it (spec: "Omvang seed-data"). No fabricated orgs, outcomes, or sources — mark anything unverified as **(niet geverifieerd)** rather than inventing it, per spec's Novum bron-discipline principle.
 - The funnel wizard (5 Novum phases) is a static form — no AI, no live bron-checking, no backend (spec: "Mijn exploraties: Novum-funnel wizard").
 - Seed-data `Exploratie` records never get a `funnel` field — only user-created ones do (spec: data model note under `Exploratie`).
-- Domain taxonomy is the 14 Trendroos sub-domains grouped into 7 clusters — exact names and colors are fixed in the spec's "Trendroos-domeinen" table and must be copied verbatim.
+- Domain taxonomy is the 15 Trendroos sub-domains grouped into 7 clusters — exact names and colors are fixed in the spec's "Trendroos-domeinen" table and must be copied verbatim.
 - Because `js/app.js` and `js/data.js` are edited across multiple tasks, later tasks locate code by **function name**, not by line number (line numbers shift after each edit).
 - Every task must be verified by running `python3 -m http.server 8000` from the project root and checking the relevant view in a browser — there is no automated test suite in this codebase (matches the original; do not introduce a test framework).
 
@@ -178,7 +178,7 @@ git commit -m "Research and compile seed dataset for Exploratie Hub"
 
 **Interfaces:**
 - Consumes: `docs/superpowers/plans/2026-07-03-seed-data.json` (Task 2)
-- Produces: `DOMAINS` (array of 14 strings), `DOMAIN_CLUSTERS` (object: domain → cluster name), `DOMAIN_COLORS` (object: domain → hex), `STATUS_COLORS` (object: status → hex), `TECHNOLOGIEEN` (array), `EXPLORATIES` (array), `TEAMS` (array), `INTERESSES` (array of domain names), `USER` (object) — all consumed by `js/app.js` in later tasks.
+- Produces: `DOMAINS` (array of 15 strings), `DOMAIN_CLUSTERS` (object: domain → cluster name), `DOMAIN_COLORS` (object: domain → hex), `STATUS_COLORS` (object: status → hex), `TECHNOLOGIEEN` (array), `EXPLORATIES` (array), `TEAMS` (array), `INTERESSES` (array of domain names), `USER` (object) — all consumed by `js/app.js` in later tasks.
 
 - [ ] **Step 1: Replace the top of `js/data.js` with the new taxonomy constants**
 
@@ -450,7 +450,7 @@ Locate `function renderHome() {` (originally ~70 lines, ending right before `fun
         <div class="head">
           <div>
             <h2>Technologieën per Trendroos-domein</h2>
-            <div class="sub">Op basis van de 14 sub-domeinen uit de Rijksbrede Trendverkenning, gegroepeerd in 7 clusters</div>
+            <div class="sub">Op basis van de 15 sub-domeinen uit de Rijksbrede Trendverkenning, gegroepeerd in 7 clusters</div>
           </div>
           <a href="#/technologieen">Bekijk alle technologieën</a>
         </div>
@@ -519,7 +519,7 @@ Append to `css/style.css`:
 
 - [ ] **Step 4: Verify Home renders (partial — `technologieCardHtml` doesn't exist yet)**
 
-This step will show a JS error in the console (`technologieCardHtml is not defined`) until Task 6 is done — that's expected and acceptable since Task 6 immediately follows. Verify only that the wheel/filter markup itself is correct by temporarily commenting out the `.hscroll` line, loading `http://localhost:8000/#/home`, and confirming: the wheel renders with 14 colored domain segments + 7 semi-transparent cluster arcs, the domain chip list appears grouped by cluster below it, and changing the org/status/jaar filters updates both the wheel numbers and the chip counts. Then uncomment the `.hscroll` line before committing (leaving the expected error for Task 6 to resolve).
+This step will show a JS error in the console (`technologieCardHtml is not defined`) until Task 6 is done — that's expected and acceptable since Task 6 immediately follows. Verify only that the wheel/filter markup itself is correct by temporarily commenting out the `.hscroll` line, loading `http://localhost:8000/#/home`, and confirming: the wheel renders with 15 colored domain segments + 7 semi-transparent cluster arcs, the domain chip list appears grouped by cluster below it, and changing the org/status/jaar filters updates both the wheel numbers and the chip counts. Then uncomment the `.hscroll` line before committing (leaving the expected error for Task 6 to resolve).
 
 - [ ] **Step 5: Commit**
 
@@ -1439,7 +1439,7 @@ python3 -m http.server 8000 &
 sleep 1
 ```
 
-Open `http://localhost:8000/#/account`, confirm the interests editor shows the 14 Trendroos domain names (not the old 6 NDS themes), and toggling one persists (reload the page, confirm selection sticks). Also check `#/onboarding` (log out first via clearing `sessionStorage` in devtools, or open in a private window) shows the same 14 domains. Stop the server.
+Open `http://localhost:8000/#/account`, confirm the interests editor shows the 15 Trendroos domain names (not the old 6 NDS themes), and toggling one persists (reload the page, confirm selection sticks). Also check `#/onboarding` (log out first via clearing `sessionStorage` in devtools, or open in a private window) shows the same 15 domains. Stop the server.
 
 - [ ] **Step 4: Commit**
 
@@ -1516,7 +1516,7 @@ Walk through, in order, and confirm each works without a console error (check vi
 - [ ] `#/mijn-exploraties` → empty state initially, tabs show correct counts
 - [ ] Create a new exploration, complete all 5 fases, confirm it appears in `#/mijn-exploraties` with "Funnel afgerond" and the chosen status
 - [ ] `#/netwerk` → search works, cards show real seed-data organizations
-- [ ] `#/account` → interests editor shows 14 domains, selection persists across reload
+- [ ] `#/account` → interests editor shows 15 domains, selection persists across reload
 - [ ] Resize the browser to a narrow (mobile) width and confirm the sidebar/wheel/wizard don't overflow horizontally
 
 - [ ] **Step 3: Fix any issues found during QA**
