@@ -480,128 +480,54 @@
 
   /* ---------- Projectdetail ---------- */
 
-  function renderProject(id) {
-    const p = getProject(id);
-    if (!p) { shell("innovaties", `<div class="empty">Project niet gevonden. <a href="#/innovaties">Terug naar overzicht</a></div>`); return; }
-    const c = person(p.contactId);
-    const similar = allProjects().filter(o => o.id !== p.id && (o.theme === p.theme || o.labels.some(l => p.labels.includes(l)))).slice(0, 8);
+  function renderTechnologieDetail(id) {
+    const t = TECHNOLOGIEEN.find(x => x.id === id);
+    if (!t) { location.hash = "#/technologieen"; return; }
+    const expls = EXPLORATIES.filter(e => e.technologieId === t.id);
+    const similar = TECHNOLOGIEEN.filter(x => x.id !== t.id && (x.domein === t.domein || x.labels.some(l => t.labels.includes(l)))).slice(0, 4);
 
-    const tabs = [
-      ["info", "Projectinformatie"],
-      ["probleem", "Probleem- & doelstelling"],
-      ["lessen", "Geleerde lessen"],
-      ["contact", "Contactpersoon"],
-      ["bieb", "Bibliotheek"],
-      ["soortgelijk", "Soortgelijke projecten"]
-    ];
-
-    const tabContent = {
-      info: `
-        <div class="two-col">
-          <div class="card content-card">
-            <h3>Projectbeschrijving</h3>
-            <p>${esc(p.beschrijving)}</p>
-            ${p.context ? `<h3>Broncontext</h3><p>${esc(p.context)}</p>` : ""}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:20px">
-            <div class="card content-card">
-              <h3>GDI-bouwblokken</h3>
-              <div>${p.gdi && p.gdi.length
-                ? p.gdi.map((g, i) => `<span class="gdi-chip" style="background:${["#fce7f3", "#dcfce7", "#e0e7ff", "#f1f5f9", "#fef3c7", "#e0f2fe"][i % 6]}">${esc(g)}</span>`).join("")
-                : `<p style="font-size:13px;color:var(--text-muted)">Geen GDI-bouwblokken herkend in de projectbeschrijving.</p>`}</div>
-            </div>
-            <div class="card content-card">
-              <h3>Labels</h3>
-              <div>${p.labels.map(l => `<span class="label-chip">${esc(l)}</span>`).join("")}</div>
-            </div>
-          </div>
-        </div>`,
-      probleem: `
-        <div class="two-col">
-          <div class="card content-card"><h3>Probleemstelling</h3><p>${esc(p.probleem) || `Er is geen aparte probleemstelling gepubliceerd op digitaleoverheid.nl. Zie de projectbeschrijving of de bronpagina.`}</p></div>
-          <div class="card content-card"><h3>Doelstelling</h3><p>${esc(p.doel) || `Er is geen aparte doelstelling gepubliceerd op digitaleoverheid.nl. Zie de projectbeschrijving of de bronpagina.`}</p></div>
-        </div>`,
-      lessen: `
-        <div class="card content-card">
-          <h3>Geleerde lessen</h3>
-          ${p.lessen && p.lessen.length ? `<ul>${p.lessen.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : `<p>Er zijn geen geleerde lessen gepubliceerd voor dit project. Raadpleeg de bronpagina op digitaleoverheid.nl voor actuele informatie.</p>`}
-        </div>`,
-      contact: `
-        <div class="contact-grid">
-          <div class="card contact-card">
-            <span class="avatar" style="width:74px;height:74px;font-size:22px;background:${c.kleur}">${initials(c.naam)}</span>
-            <div class="info">
-              <div class="name">${esc(c.naam)}</div>
-              <div class="k">Organisatie</div><div class="v">${esc(c.org)}</div>
-              <div class="k">Afdeling</div><div class="v">${esc(c.afdeling)}</div>
-              <div class="k">Rol/functie</div><div class="v">${esc(c.rol)}</div>
-              <div class="k">Betrokken bij</div><div class="v">${esc(c.betrokkenBij)}</div>
-            </div>
-          </div>
-          <div class="card socials">
-            <h3>Contact</h3>
-            ${c.email ? `<div class="row"><span class="ic">${I.mail}</span><a href="mailto:${esc(c.email)}">${esc(c.email)}</a></div>` : ""}
-            ${c.tel ? `<div class="row"><span class="ic">${I.phone}</span><span>${esc(c.tel)}</span></div>` : ""}
-            ${p.bron ? `<div class="row"><span class="ic">${I.linkIc}</span><a href="${esc(p.bron)}" target="_blank" rel="noopener">Projectpagina op digitaleoverheid.nl</a></div>` : ""}
-            ${!c.email && !c.tel ? `<p style="font-size:12.5px;color:var(--text-muted);margin-top:8px">Er zijn geen persoonlijke contactgegevens gepubliceerd; neem contact op via de projectpagina of de regievoerende organisatie.</p>` : ""}
-          </div>
-        </div>`,
-      bieb: `
-        <div class="file-list">
-          ${p.files.map(f => `
-            <div class="card file-row">
-              ${f.type === "link" ? I.linkIc : I.file}
-              <span class="fname">${esc(f.naam)}${f.type !== "link" ? ` (${esc(f.type)}, ${esc(f.grootte)}, ${esc(f.datum)})` : ` (${esc(f.datum)})`}</span>
-              ${f.url
-                ? `<a href="${esc(f.url)}" target="_blank" rel="noopener">Openen</a>`
-                : `<a href="#" onclick="IH.toast('Voorbeeldbestand — downloads zijn niet beschikbaar in deze demo');return false;">${f.actie === "download" ? I.download + " Download" : "Openen"}</a>`}
-            </div>`).join("")}
-        </div>`,
-      soortgelijk: similar.length
-        ? `<div class="hscroll">${similar.map(o => cardHtml(o, { labels: true })).join("")}</div>`
-        : `<div class="empty">Geen soortgelijke projecten gevonden.</div>`
-    };
-
-    shell("innovaties", `
-      <div class="detail-top">
-        <button class="icon-btn" onclick="history.back()" aria-label="Terug">${I.back}</button>
-        <button class="icon-btn" id="shareBtn" aria-label="Delen">${I.share}</button>
-      </div>
-      <div class="detail-head">
-        <div class="thumb" style="${thumbStyle(p.theme)}">${THEME_ICONS[p.theme] || ""}${tagHtml(p.theme)}</div>
-        <div class="detail-meta">
-          <h1>${esc(p.title)}</h1>
-          <div class="meta-grid">
-            <div class="meta-item"><div class="k">Project status</div><div class="v">${statusDot(p.status)}${esc(p.status)}</div></div>
-            <div class="meta-item"><div class="k">Jaar innovatiebudget</div><div class="v">${esc(p.jaar || "-")}</div></div>
-            <div class="meta-item"><div class="k">Projectfase</div><div class="v">${esc(p.fase)}</div></div>
-            <div class="meta-item"><div class="k">Type organisatie</div><div class="v">${esc(p.typeOrganisatie || "-")}</div></div>
-            <div class="meta-item"><div class="k">Regievoerder</div><div class="v">${esc(p.org)}</div></div>
-            <div class="meta-item"><div class="k">Plaats</div><div class="v">${esc(p.plaats || "-")}</div></div>
-            <div class="meta-item"><div class="k">Partnerorganisaties</div><div class="v">${esc((p.partners || []).join(", ") || "-")}</div></div>
-            <div class="meta-item"><div class="k">Bron</div><div class="v">${p.bron ? `<a href="${esc(p.bron)}" target="_blank" rel="noopener">digitaleoverheid.nl</a>` : "-"}</div></div>
-          </div>
+    shell("technologieen", `
+      <a href="#/technologieen" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-bottom:14px">${I.back} Terug naar technologieën</a>
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">${esc(t.naam)}</h1>
+          <div class="page-sub">${esc(t.domein)} · TRL ${t.trl} · ${expls.length} exploratie${expls.length === 1 ? "" : "s"}</div>
         </div>
       </div>
+      <p>${esc(t.korteBeschrijving)}</p>
+      <div class="labels-block">${t.labels.map(l => `<span class="label-chip">${esc(l)}</span>`).join("")}</div>
+
       <div class="tabs" id="tabs">
-        ${tabs.map(([tid, lbl], i) => `<button data-t="${tid}" class="${i === 0 ? "active" : ""}">${lbl}</button>`).join("")}
+        <button data-tab="orgs" class="active">Wie onderzoekt dit</button>
+        <button data-tab="similar">Soortgelijke technologieën</button>
       </div>
-      <div id="tabBody">${tabContent.info}</div>
+      <div id="tabBody"></div>
     `);
 
+    function renderOrgsTab() {
+      return expls.length ? `<div class="grid">${expls.map(e => `
+        <div class="card">
+          <h3>${esc(e.org)}</h3>
+          <div class="org">${esc(e.typeOrganisatie)} · ${esc(e.jaar)} · <span style="color:${STATUS_COLORS[e.status]}">${esc(e.status)}</span></div>
+          <p>${esc(e.samenvatting)}</p>
+          ${e.uitkomst ? `<p><strong>Uitkomst:</strong> ${esc(e.uitkomst)}</p>` : ""}
+          ${e.bron ? `<a href="${esc(e.bron)}" target="_blank" rel="noopener">Bron ${I.back}</a>` : ""}
+        </div>`).join("")}</div>` : `<div class="empty">Nog geen exploraties bekend voor deze technologie.</div>`;
+    }
+    function renderSimilarTab() {
+      return similar.length ? `<div class="hscroll">${similar.map(technologieCardHtml).join("")}</div>` : `<div class="empty">Geen soortgelijke technologieën gevonden.</div>`;
+    }
+
+    function showTab(tab) {
+      document.getElementById("tabBody").innerHTML = tab === "orgs" ? renderOrgsTab() : renderSimilarTab();
+      bindTechCards();
+      document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    }
     document.getElementById("tabs").addEventListener("click", e => {
-      const b = e.target.closest("button[data-t]"); if (!b) return;
-      document.querySelectorAll("#tabs button").forEach(x => x.classList.remove("active"));
-      b.classList.add("active");
-      document.getElementById("tabBody").innerHTML = tabContent[b.dataset.t];
-      bindCards();
+      const b = e.target.closest("button[data-tab]"); if (!b) return;
+      showTab(b.dataset.tab);
     });
-    document.getElementById("shareBtn").onclick = () => {
-      const url = location.href;
-      if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => toast("Link gekopieerd naar klembord"));
-      else toast("Kopieer de link uit de adresbalk om te delen");
-    };
-    bindCards();
+    showTab("orgs");
   }
 
   /* ---------- Mijn projecten ---------- */
