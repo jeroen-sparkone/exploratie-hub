@@ -872,6 +872,49 @@
     }, false);
   }
 
+  function renderFase4(expl) {
+    const f = expl.funnel.fase4;
+    const body = `
+      <div class="field"><label class="req">Overzicht van resultaten</label><textarea id="w-overzicht">${esc(f.resultatenoverzicht)}</textarea></div>
+      <h3>Communicatieplan (Communicatie Canvas)</h3>
+      <div class="field"><label>Titel (pakkend, nieuwsgierig makend)</label><input type="text" id="w-c-titel" value="${esc(f.canvas.titel)}"></div>
+      <div class="field"><label>Aanleiding (probleem, waarom belangrijk, opdrachtgever)</label><textarea id="w-c-aanleiding">${esc(f.canvas.aanleiding)}</textarea></div>
+      <div class="field"><label>Aanpak (stappen, wat uniek/vernieuwend, team)</label><textarea id="w-c-aanpak">${esc(f.canvas.aanpak)}</textarea></div>
+      <div class="field"><label>Resultaat (concreet resultaat, opbrengst, geleerd)</label><textarea id="w-c-resultaat">${esc(f.canvas.resultaat)}</textarea></div>
+      <div class="field"><label>Relevantie (wie heeft baat, doelgroep, wat kunnen anderen leren)</label><textarea id="w-c-relevantie">${esc(f.canvas.relevantie)}</textarea></div>
+      <div class="field"><label>Hoe verder (vervolgstappen, waar meer info)</label><textarea id="w-c-hoeverder">${esc(f.canvas.hoeVerder)}</textarea></div>
+      <div class="field"><label>Call to action</label><input type="text" id="w-c-cta" value="${esc(f.canvas.callToAction)}"></div>
+      <div class="field"><label>Interne communicatie (wat, kanalen)</label><textarea id="w-intern">${esc(f.interneCommunicatie)}</textarea></div>
+      <div class="field"><label>Externe communicatie (wat, kanalen)</label><textarea id="w-extern">${esc(f.externeCommunicatie)}</textarea></div>
+      <div class="field"><label>Opslaan van bestanden (waar, links)</label><textarea id="w-opslag">${esc(f.opslagBestanden)}</textarea></div>
+      <div class="field"><label class="req">Reflectie — wat heb je geleerd?</label><textarea id="w-reflectie">${esc(f.reflectie)}</textarea></div>
+    `;
+    wizardShell(expl, body, [
+      ["resultatenoverzicht", "Overzicht van resultaten gemaakt"],
+      ["communicatieplan", "Communicatieplan opgesteld"],
+      ["demoGedaan", "Demo gedaan aan het team"],
+      ["bestandenOpgeslagen", "Bestanden opgeslagen"]
+    ], () => {
+      f.resultatenoverzicht = document.getElementById("w-overzicht").value;
+      f.canvas.titel = document.getElementById("w-c-titel").value;
+      f.canvas.aanleiding = document.getElementById("w-c-aanleiding").value;
+      f.canvas.aanpak = document.getElementById("w-c-aanpak").value;
+      f.canvas.resultaat = document.getElementById("w-c-resultaat").value;
+      f.canvas.relevantie = document.getElementById("w-c-relevantie").value;
+      f.canvas.hoeVerder = document.getElementById("w-c-hoeverder").value;
+      f.canvas.callToAction = document.getElementById("w-c-cta").value;
+      f.interneCommunicatie = document.getElementById("w-intern").value;
+      f.externeCommunicatie = document.getElementById("w-extern").value;
+      f.opslagBestanden = document.getElementById("w-opslag").value;
+      f.reflectie = document.getElementById("w-reflectie").value;
+      document.querySelectorAll("[data-check]").forEach(cb => { f.checklist[cb.dataset.check] = cb.checked; });
+      expl.funnel.huidigeFase = 5;
+      saveExploratie(expl);
+      toast("Exploratie afgerond — bekijk 'm terug bij Mijn exploraties");
+      location.hash = "#/mijn-exploraties";
+    }, true);
+  }
+
   /* ---------- Netwerk ---------- */
 
   const netState = { q: "" };
