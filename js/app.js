@@ -314,7 +314,7 @@
         <div class="head">
           <div>
             <h2>Technologieën per Trendroos-domein</h2>
-            <div class="sub">Op basis van de 14 sub-domeinen uit de Rijksbrede Trendverkenning, gegroepeerd in 7 clusters</div>
+            <div class="sub">Op basis van de 15 sub-domeinen uit de Rijksbrede Trendverkenning, gegroepeerd in 7 clusters</div>
           </div>
           <a href="#/technologieen">Bekijk alle technologieën</a>
         </div>
