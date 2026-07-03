@@ -389,3 +389,10 @@ button { font-family: inherit; cursor: pointer; }
   .main { margin-left: 64px; padding: 20px 16px 48px; }
   .detail-head .thumb { width: 100%; }
 }
+
+.wizard-steps { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+.wizard-step { flex: 1; min-width: 110px; font-size: 11px; text-align: center; padding: 8px 4px; border-radius: 8px; background: #f1f1f1; color: var(--text-muted); }
+.wizard-step.active { background: #1a1f26; color: #fff; font-weight: 600; }
+.wizard-step.done { background: #d7f5df; color: #1b5e3a; }
+.wizard-checklist, .wizard-parkeerbord { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.wizard-checklist label { display: block; font-size: 13px; margin-bottom: 6px; }

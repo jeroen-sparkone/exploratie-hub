@@ -16,6 +16,70 @@
     set(k, v) { try { localStorage.setItem("ehub:" + k, JSON.stringify(v)); } catch { } }
   };
 
+  function emptyFunnel() {
+    return {
+      huidigeFase: 0,
+      fase0: { trend: "", relevantie: "", motivatie: "", bronnen: [], checklist: { trendBeschreven: false, relevantieBeschreven: false, motivatieBeschreven: false, bronnenVastgelegd: false } },
+      fase1: { doel: "", hoofdvraag: "", deelvragen: [], inScope: [], buitenScope: [], aandachtspunten: "", checklist: { doelBeschreven: false, onderzoeksvragenGemaakt: false, afgebakend: false, trendBesproken: false } },
+      fase2: { omschrijving: "", definitie: "", definitieBronnen: [], toepassingen: [], kansenKort: [], kansenLang: [], risicosKort: [], risicosLang: [], checklist: { omschrevenGedefinieerd: false, toepassingenBeschreven: false, kansenRisicos: false } },
+      fase3: { interviews: [], meerwaarde: { organisatie: "", medewerker: "", burger: "" }, miniTest: { opzet: "", resultaten: "", conclusie: "" }, bestaandeInitiatieven: "", conclusieHoofdvraag: "", conclusieDeelvragen: [], checklist: { interviewsGedaan: false, meerwaardeBeschreven: false, initiatievenOnderzocht: false, conclusieGeformuleerd: false } },
+      fase4: { resultatenoverzicht: "", canvas: { titel: "", aanleiding: "", aanpak: "", resultaat: "", relevantie: "", hoeVerder: "", callToAction: "" }, interneCommunicatie: "", externeCommunicatie: "", opslagBestanden: "", reflectie: "", checklist: { resultatenoverzicht: false, communicatieplan: false, demoGedaan: false, bestandenOpgeslagen: false } },
+      parkeerbord: []
+    };
+  }
+
+  const FASE_TITELS = ["Trend kiezen", "Focus kiezen", "Informatie verzamelen", "Waarde bepalen", "Delen en inspireren"];
+  const FASE_TIMEBOXES = ["max. 2 uur", "max. 2 uur", "max. 2 uur", "max. 4 uur", "max. 1 uur"];
+
+  function saveExploratie(e) {
+    const extra = store.get("extraExploraties", []);
+    const idx = extra.findIndex(x => x.id === e.id);
+    if (idx === -1) extra.push(e); else extra[idx] = e;
+    store.set("extraExploraties", extra);
+  }
+
+  function allTechnologieen() { return TECHNOLOGIEEN.concat(store.get("extraTechnologieen", [])); }
+
+  function saveNieuweTechnologie(t) {
+    const extra = store.get("extraTechnologieen", []);
+    extra.push(t);
+    store.set("extraTechnologieen", extra);
+  }
+
+  function wizardShell(expl, bodyHtml, checklistItems, onSaveAndNext, isLastFase) {
+    const fase = expl.funnel.huidigeFase;
+    shell("mijn-exploraties", `
+      <a href="#/mijn-exploraties" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-bottom:14px">${I.back} Terug naar mijn exploraties</a>
+      <div class="wizard-steps">
+        ${FASE_TITELS.map((t, i) => `<div class="wizard-step${i === fase ? " active" : ""}${i < fase ? " done" : ""}">Fase ${i}<br>${esc(t)}</div>`).join("")}
+      </div>
+      <div class="card np-form">
+        <h1>Fase ${fase}: ${esc(FASE_TITELS[fase])}</h1>
+        <div class="sub">Richtlijn: ${esc(FASE_TIMEBOXES[fase])}</div>
+        <div id="wizardBody">${bodyHtml}</div>
+        <div class="wizard-checklist">
+          <h3>Checklist</h3>
+          ${checklistItems.map(([key, label]) => `<label><input type="checkbox" data-check="${esc(key)}"> ${esc(label)}</label>`).join("<br>")}
+        </div>
+        <div class="wizard-parkeerbord">
+          <h3>Parkeerbord</h3>
+          <ul id="parkeerbordList">${expl.funnel.parkeerbord.map(p => `<li>${esc(p)}</li>`).join("")}</ul>
+          <div class="row2"><input type="text" id="parkeerbordInput" placeholder="Zijpad of idee voor later"><button type="button" class="btn btn-ghost" id="parkeerbordAdd">Toevoegen</button></div>
+        </div>
+        <button class="btn btn-primary" id="wizardNext" style="margin-top:16px">${isLastFase ? "Exploratie afronden" : "Opslaan en naar volgende fase"}</button>
+      </div>
+    `);
+    document.getElementById("parkeerbordAdd").onclick = () => {
+      const input = document.getElementById("parkeerbordInput");
+      if (!input.value.trim()) return;
+      expl.funnel.parkeerbord.push(input.value.trim());
+      saveExploratie(expl);
+      document.getElementById("parkeerbordList").innerHTML = expl.funnel.parkeerbord.map(p => `<li>${esc(p)}</li>`).join("");
+      input.value = "";
+    };
+    document.getElementById("wizardNext").onclick = () => onSaveAndNext();
+  }
+
   function allExploraties() { return EXPLORATIES.concat(store.get("extraExploraties", [])); }
   function getProject(id) { return allProjects().find(p => p.id === id); }
   function person(id) { return PEOPLE.find(p => p.id === id) || PEOPLE[0]; }
@@ -303,8 +367,8 @@
     const jaren = [...new Set(allExploraties().map(e => e.jaar))].sort().reverse();
 
     const my = interests();
-    const rec = TECHNOLOGIEEN.filter(t => t.labels.some(l => my.includes(l)) || my.includes(t.domein)).slice(0, 10);
-    const recList = rec.length ? rec : TECHNOLOGIEEN.slice(0, 8);
+    const rec = allTechnologieen().filter(t => t.labels.some(l => my.includes(l)) || my.includes(t.domein)).slice(0, 10);
+    const recList = rec.length ? rec : allTechnologieen().slice(0, 8);
 
     shell("home", `
       <h1 class="page-title" style="margin-bottom:22px">Welkom ${esc(USER.voornaam)}</h1>
@@ -348,7 +412,7 @@
       );
       const techIds = new Set(filtered.map(e => e.technologieId));
       const c = {};
-      TECHNOLOGIEEN.forEach(t => { if (techIds.has(t.id)) c[t.domein] = (c[t.domein] || 0) + 1; });
+      allTechnologieen().forEach(t => { if (techIds.has(t.id)) c[t.domein] = (c[t.domein] || 0) + 1; });
       return c;
     }
 
@@ -449,7 +513,7 @@
       techState.q = els.q.value; techState.domein = els.pDomein.value; techState.org = els.pOrg.value;
       techState.status = els.pStatus.value; techState.jaar = els.pJaar.value; techState.sort = els.sort.value;
 
-      let list = TECHNOLOGIEEN.filter(t => {
+      let list = allTechnologieen().filter(t => {
         const matchesQ = !techState.q || (t.naam + " " + t.korteBeschrijving).toLowerCase().includes(techState.q.toLowerCase());
         const matchesDomein = !techState.domein || t.domein === techState.domein;
         const explsForTech = allExploraties().filter(e => e.technologieId === t.id);
@@ -481,10 +545,10 @@
   /* ---------- Projectdetail ---------- */
 
   function renderTechnologieDetail(id) {
-    const t = TECHNOLOGIEEN.find(x => x.id === id);
+    const t = allTechnologieen().find(x => x.id === id);
     if (!t) { location.hash = "#/technologieen"; return; }
     const expls = allExploraties().filter(e => e.technologieId === t.id);
-    const similar = TECHNOLOGIEEN.filter(x => x.id !== t.id && (x.domein === t.domein || x.labels.some(l => t.labels.includes(l)))).slice(0, 4);
+    const similar = allTechnologieen().filter(x => x.id !== t.id && (x.domein === t.domein || x.labels.some(l => t.labels.includes(l)))).slice(0, 4);
 
     shell("technologieen", `
       <a href="#/technologieen" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-bottom:14px">${I.back} Terug naar technologieën</a>
@@ -569,7 +633,7 @@
       );
       document.getElementById("results").innerHTML = list.length
         ? list.map(e => {
-            const t = TECHNOLOGIEEN.find(x => x.id === e.technologieId);
+            const t = allTechnologieen().find(x => x.id === e.technologieId);
             return `<div class="card">
               <h3>${esc(t ? t.naam : e.technologieId)} ${funnelBadge(e)}</h3>
               <div class="org">${esc(e.org)} · <span style="color:${STATUS_COLORS[e.status]}">${esc(e.status)}</span></div>
@@ -589,206 +653,134 @@
     update();
   }
 
-  /* ---------- Nieuw project ---------- */
+  /* ---------- Nieuwe exploratie (Novum-funnel) ---------- */
 
-  function renderNieuwProject() {
-    const fases = ["Idee", "Proof of concept", "Pilot", "Implementatie", "Opgeschaald"];
-    const statuses = Object.keys(STATUS_COLORS);
+  function renderNieuweExploratie(param) {
+    let expl = param ? allExploraties().find(x => x.id === param) : null;
+    if (!expl) {
+      expl = { id: "expl-" + Date.now(), technologieId: "", org: USER.org, typeOrganisatie: "Rijksoverheid", status: "Onderzoekt", jaar: String(new Date().getFullYear()), samenvatting: "", uitkomst: "", bron: "", team: USER.afdeling, mine: true, funnel: emptyFunnel() };
+      saveExploratie(expl);
+      location.hash = "#/nieuwe-exploratie/" + expl.id;
+      return;
+    }
+    const fase = expl.funnel.huidigeFase;
+    if (fase === 0) return renderFase0(expl);
+    if (fase === 1) return renderFase1(expl);
+    if (fase === 2) return renderFase2(expl);
+    if (fase === 3) return renderFase3(expl);
+    return renderFase4(expl);
+  }
 
-    shell("mijn-projecten", `
-      <a href="#/mijn-projecten" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-bottom:14px">${I.back} Terug naar projecten</a>
-      <div class="np-layout">
-        <form class="card np-form" id="npForm">
-          <h1>Nieuw project aanmaken</h1>
-          <div class="sub">Vul hieronder de gegevens in om een nieuw innovatieproject toe te voegen</div>
-
-          <div class="np-section">
-            <button type="button" class="sec-head">Projectinformatie <span>⌃</span></button>
-            <div class="sec-body">
-              <div class="row2">
-                <div class="field"><label class="req" for="npTitel">Titel</label><input type="text" id="npTitel" placeholder="Voer projecttitel in"></div>
-                <div class="field"><label class="req" for="npThema">Thema</label>
-                  <div class="select-wrap"><select id="npThema"><option value="">Kies een thema</option>${THEMES.map(t => `<option>${esc(t)}</option>`).join("")}</select></div>
-                </div>
-              </div>
-              <div class="field">
-                <label>Afbeelding</label>
-                <div class="upload-zone">
-                  <button type="button" class="btn btn-ghost" onclick="IH.toast('Uploaden is nog niet beschikbaar in deze MVP')">Uploaden ${I.upload}</button>
-                  <strong>Kies een bestand of sleep het hiernaartoe</strong>
-                  JPEG, PNG, SVG en WebP-afbeeldingen
-                </div>
-              </div>
-              <div class="field"><label class="req" for="npOms">Omschrijving</label><textarea id="npOms" placeholder="Voer projectomschrijving in"></textarea></div>
-            </div>
-          </div>
-
-          <div class="np-section">
-            <button type="button" class="sec-head">Projectdetails <span>⌃</span></button>
-            <div class="sec-body">
-              <div class="row2">
-                <div class="field"><label class="req" for="npStatus">Projectstatus</label>
-                  <div class="select-wrap"><select id="npStatus">${statuses.map(s => `<option>${esc(s)}</option>`).join("")}</select></div>
-                </div>
-                <div class="field"><label class="req" for="npFase">Projectfase</label>
-                  <div class="select-wrap"><select id="npFase">${fases.map(f => `<option>${esc(f)}</option>`).join("")}</select></div>
-                </div>
-              </div>
-              <div class="row2">
-                <div class="field"><label class="req" for="npStart">Startdatum</label><input type="date" id="npStart"></div>
-                <div class="field"><label for="npEind">Einddatum</label><input type="date" id="npEind"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="np-section">
-            <button type="button" class="sec-head">Contactpersoon <span>⌃</span></button>
-            <div class="sec-body">
-              <div class="radio-row">
-                <label><input type="radio" name="cp" checked> Ik ben de contactpersoon</label>
-                <label><input type="radio" name="cp"> Selecteer een persoon</label>
-                <label><input type="radio" name="cp"> Handmatig invoeren</label>
-              </div>
-              <div class="me-card">
-                <span class="avatar">${USER.initialen}</span>
-                <div>
-                  <div class="nm">${esc(USER.naam)}</div>
-                  <div class="sub2">${esc(USER.rol)}<br>${esc(USER.org)}</div>
-                  <div class="contacts"><span>${I.mail} ${esc(USER.email)}</span><span>${I.phone} ${esc(USER.tel)}</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="np-section">
-            <button type="button" class="sec-head">Organisaties <span>⌃</span></button>
-            <div class="sec-body">
-              <div class="field"><label class="req" for="npOrg">Projectorganisatie</label><input type="text" id="npOrg" placeholder="Voer organisatienaam in"></div>
-              <div class="field"><label for="npPartners">Partnerorganisaties</label><input type="text" id="npPartners" placeholder="Voer partnerorganisaties in (gescheiden door komma's)"></div>
-            </div>
-          </div>
-
-          <div class="np-section collapsed">
-            <button type="button" class="sec-head">Projectinhoud <span>⌄</span></button>
-            <div class="sec-body">
-              <div class="field"><label for="npProbleem">Probleemstelling</label><textarea id="npProbleem" placeholder="Welk probleem lost dit project op?"></textarea></div>
-              <div class="field"><label for="npDoel">Doelstelling</label><textarea id="npDoel" placeholder="Wat is het doel van het project?"></textarea></div>
-            </div>
-          </div>
-
-          <div class="np-section collapsed">
-            <button type="button" class="sec-head">GDI-bouwblokken <span>⌄</span></button>
-            <div class="sec-body">
-              <div class="chip-cloud" style="justify-content:flex-start" id="npGdi">
-                ${GDI_BOUWBLOKKEN.map(g => `<button type="button" class="chip" data-v="${esc(g)}">+ ${esc(g)}</button>`).join("")}
-              </div>
-            </div>
-          </div>
-
-          <div class="np-section collapsed">
-            <button type="button" class="sec-head">Labels <span>⌄</span></button>
-            <div class="sec-body">
-              <div class="chip-cloud" style="justify-content:flex-start" id="npLabels">
-                ${INTERESSES.slice(0, 20).map(l => `<button type="button" class="chip" data-v="${esc(l)}">+ ${esc(l)}</button>`).join("")}
-              </div>
-            </div>
-          </div>
-
-          <div class="np-section collapsed">
-            <button type="button" class="sec-head">Bestand toevoegen <span>⌄</span></button>
-            <div class="sec-body">
-              <div class="upload-zone">Bestanden uploaden is nog niet beschikbaar in deze MVP.</div>
-            </div>
-          </div>
-
-          <div class="np-actions">
-            <button type="submit" class="btn btn-primary" data-mode="delen">Project delen</button>
-            <button type="submit" class="btn btn-outline" data-mode="concept">Opslaan als concept</button>
-          </div>
-        </form>
-
-        <aside class="card np-aside">
-          <h3>Vergelijkbare projecten</h3>
-          <div class="sub">Ontdek of er al vergelijkbare projecten bestaan</div>
-          <div id="similarBox"><p style="font-size:12.5px;color:var(--text-muted)">Er zijn nog geen vergelijkbare projecten gevonden…</p></div>
-        </aside>
+  function renderFase0(expl) {
+    const f = expl.funnel.fase0;
+    const existing = allTechnologieen();
+    const body = `
+      <div class="field"><label class="req">Wat is de trend of technologie?</label><textarea id="w-trend">${esc(f.trend)}</textarea></div>
+      <div class="field"><label class="req">Waarom is het relevant voor de organisatie?</label><textarea id="w-relevantie">${esc(f.relevantie)}</textarea></div>
+      <div class="field"><label class="req">Waarom heb je deze trend gekozen, en wie heeft er wat aan?</label><textarea id="w-motivatie">${esc(f.motivatie)}</textarea></div>
+      <div class="field"><label>Geraadpleegde bronnen (titel — organisatie — jaar — link, één per regel)</label><textarea id="w-bronnen">${esc(f.bronnen.map(b => `${b.titel} — ${b.organisatie} — ${b.jaar} — ${b.link}`).join("\n"))}</textarea></div>
+      <div id="similarBox" class="hscroll"></div>
+      <div class="field">
+        <label class="req">Aan welke technologie in de hub koppel je deze exploratie?</label>
+        <div class="select-wrap"><select id="w-tech-select">
+          <option value="">— Kies een bestaande technologie —</option>
+          ${existing.map(t => `<option value="${esc(t.id)}"${expl.technologieId === t.id ? " selected" : ""}>${esc(t.naam)}</option>`).join("")}
+          <option value="__new__">+ Nieuwe technologie aanmaken</option>
+        </select></div>
       </div>
-    `);
-
-    // Inklapbare secties
-    document.querySelectorAll(".np-section .sec-head").forEach(h => {
-      h.addEventListener("click", () => {
-        const sec = h.parentElement;
-        sec.classList.toggle("collapsed");
-        h.querySelector("span").textContent = sec.classList.contains("collapsed") ? "⌄" : "⌃";
+      <div id="newTechFields" style="display:none">
+        <div class="row2">
+          <div class="field"><label class="req">Naam nieuwe technologie</label><input type="text" id="w-newtech-naam"></div>
+          <div class="field"><label class="req">Domein</label>
+            <div class="select-wrap"><select id="w-newtech-domein">${DOMAINS.map(d => `<option>${esc(d)}</option>`).join("")}</select></div>
+          </div>
+        </div>
+        <div class="field"><label class="req">TRL (1-9)</label><input type="number" id="w-newtech-trl" min="1" max="9" value="1"></div>
+      </div>
+    `;
+    wizardShell(expl, body, [
+      ["trendBeschreven", "Trend beschreven"],
+      ["relevantieBeschreven", "Relevantie beschreven"],
+      ["motivatieBeschreven", "Waarom gekozen beschreven"],
+      ["bronnenVastgelegd", "Geraadpleegde bronnen beschreven"]
+    ], () => {
+      f.trend = document.getElementById("w-trend").value;
+      f.relevantie = document.getElementById("w-relevantie").value;
+      f.motivatie = document.getElementById("w-motivatie").value;
+      f.bronnen = document.getElementById("w-bronnen").value.split("\n").filter(Boolean).map(line => {
+        const [titel, organisatie, jaar, link] = line.split("—").map(s => (s || "").trim());
+        return { titel, organisatie, jaar, link };
       });
-    });
+      document.querySelectorAll("[data-check]").forEach(cb => { f.checklist[cb.dataset.check] = cb.checked; });
 
-    // Chip-selectie
-    const selGdi = new Set(), selLabels = new Set();
-    function chipToggle(containerId, set) {
-      document.getElementById(containerId).addEventListener("click", e => {
-        const b = e.target.closest(".chip"); if (!b) return;
-        const v = b.dataset.v;
-        set.has(v) ? set.delete(v) : set.add(v);
-        b.classList.toggle("selected", set.has(v));
-        b.textContent = (set.has(v) ? "✓ " : "+ ") + v;
-      });
-    }
-    chipToggle("npGdi", selGdi);
-    chipToggle("npLabels", selLabels);
+      const techChoice = document.getElementById("w-tech-select").value;
+      if (techChoice === "__new__") {
+        const naam = document.getElementById("w-newtech-naam").value.trim() || f.trend.slice(0, 60);
+        const nieuweTech = {
+          id: "tech-" + naam.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now(),
+          naam, domein: document.getElementById("w-newtech-domein").value,
+          korteBeschrijving: f.trend.slice(0, 160), trl: Number(document.getElementById("w-newtech-trl").value) || 1,
+          labels: []
+        };
+        saveNieuweTechnologie(nieuweTech);
+        expl.technologieId = nieuweTech.id;
+      } else if (techChoice) {
+        expl.technologieId = techChoice;
+      }
 
-    // Vergelijkbare projecten (live op titel/omschrijving/thema)
-    const titelEl = document.getElementById("npTitel"), omsEl = document.getElementById("npOms"), themaEl = document.getElementById("npThema");
-    function updateSimilar() {
-      const words = (titelEl.value + " " + omsEl.value).toLowerCase().split(/\W+/).filter(w => w.length > 3);
-      const theme = themaEl.value;
-      const scored = allProjects().map(p => {
-        const hay = (p.title + " " + p.kort).toLowerCase();
-        let score = words.reduce((s, w) => s + (hay.includes(w) ? 1 : 0), 0);
-        if (theme && p.theme === theme) score += 1;
-        return { p, score };
-      }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 4);
+      expl.samenvatting = f.trend.slice(0, 160);
+      expl.funnel.huidigeFase = 1;
+      saveExploratie(expl);
+      location.hash = "#/nieuwe-exploratie/" + expl.id;
+      location.reload();
+    }, false);
+
+    function updateSimilarTech() {
+      const words = document.getElementById("w-trend").value.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+      const scored = existing.map(t => ({ t, score: words.reduce((s, w) => s + ((t.naam + " " + t.korteBeschrijving).toLowerCase().includes(w) ? 1 : 0), 0) }))
+        .filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 4);
       document.getElementById("similarBox").innerHTML = scored.length
-        ? scored.map(({ p }) => `
-            <div class="mini" onclick="location.hash='#/project/${esc(p.id)}'">
-              <div class="sw" style="${thumbStyle(p.theme)}"></div>
-              <div><h4>${esc(p.title)}</h4><p>${esc(p.org)} · ${esc(p.theme)}</p></div>
-            </div>`).join("")
-        : `<p style="font-size:12.5px;color:var(--text-muted)">Er zijn nog geen vergelijkbare projecten gevonden…</p>`;
+        ? `<p class="sub">Vergelijkbare technologieën in de hub — kies er één hierboven, of maak een nieuwe aan:</p>` + scored.map(({ t }) => technologieCardHtml(t)).join("")
+        : `<p style="font-size:12.5px;color:var(--text-muted)">Nog geen vergelijkbare technologieën gevonden…</p>`;
+      bindTechCards();
     }
-    titelEl.addEventListener("input", updateSimilar);
-    omsEl.addEventListener("input", updateSimilar);
-    themaEl.addEventListener("change", updateSimilar);
+    document.getElementById("w-trend").addEventListener("input", updateSimilarTech);
+    document.getElementById("w-tech-select").addEventListener("change", e => {
+      document.getElementById("newTechFields").style.display = e.target.value === "__new__" ? "block" : "none";
+    });
+    updateSimilarTech();
+  }
 
-    // Opslaan
-    let mode = "delen";
-    document.querySelectorAll(".np-actions .btn").forEach(b => b.addEventListener("click", () => { mode = b.dataset.mode; }));
-    document.getElementById("npForm").onsubmit = e => {
-      e.preventDefault();
-      const titel = titelEl.value.trim(), thema = themaEl.value, oms = omsEl.value.trim(), org = document.getElementById("npOrg").value.trim();
-      if (!titel || !thema || !oms || !org) { toast("Vul de verplichte velden in (titel, thema, omschrijving, organisatie)"); return; }
-      const fmt = iso => iso ? iso.split("-").reverse().join("-") : "-";
-      const nieuw = {
-        id: "eigen-" + Date.now(),
-        title: titel, org, theme: thema,
-        status: mode === "concept" ? "Concept" : document.getElementById("npStatus").value,
-        fase: document.getElementById("npFase").value,
-        start: fmt(document.getElementById("npStart").value), eind: fmt(document.getElementById("npEind").value),
-        gepubliceerd: new Date().toLocaleDateString("nl-NL"), bijgewerkt: new Date().toLocaleDateString("nl-NL"),
-        partners: document.getElementById("npPartners").value.split(",").map(s => s.trim()).filter(Boolean),
-        kort: oms.slice(0, 220), beschrijving: oms,
-        probleem: document.getElementById("npProbleem").value.trim() || "Nog niet ingevuld.",
-        doel: document.getElementById("npDoel").value.trim() || "Nog niet ingevuld.",
-        lessen: [], gdi: [...selGdi], labels: [...selLabels],
-        contactId: "tdv", files: [], mine: true, eigen: true
-      };
-      const extra = store.get("extraProjects", []);
-      extra.push(nieuw);
-      store.set("extraProjects", extra);
-      toast(mode === "concept" ? "Project opgeslagen als concept" : "Project gedeeld op de Innovatie Hub");
-      nav("#/mijn-projecten");
-    };
+  function renderFase1(expl) {
+    const f = expl.funnel.fase1;
+    const body = `
+      <div class="field"><label class="req">Doel exploratie</label><textarea id="w-doel">${esc(f.doel)}</textarea></div>
+      <div class="field"><label class="req">Hoofdvraag</label><input type="text" id="w-hoofdvraag" value="${esc(f.hoofdvraag)}"></div>
+      <div class="field"><label>Deelvragen (één per regel, 3-5)</label><textarea id="w-deelvragen">${esc(f.deelvragen.join("\n"))}</textarea></div>
+      <div class="row2">
+        <div class="field"><label>In scope (één per regel)</label><textarea id="w-inscope">${esc(f.inScope.join("\n"))}</textarea></div>
+        <div class="field"><label>Buiten scope (één per regel)</label><textarea id="w-buitenscope">${esc(f.buitenScope.join("\n"))}</textarea></div>
+      </div>
+      <div class="field"><label>Aandachtspunten en afspraken (portfoliomeeting)</label><textarea id="w-aandachtspunten">${esc(f.aandachtspunten)}</textarea></div>
+    `;
+    wizardShell(expl, body, [
+      ["doelBeschreven", "Doel exploratie beschreven"],
+      ["onderzoeksvragenGemaakt", "Onderzoeksvragen gemaakt"],
+      ["afgebakend", "Onderzoek afgebakend"],
+      ["trendBesproken", "Trend besproken"]
+    ], () => {
+      f.doel = document.getElementById("w-doel").value;
+      f.hoofdvraag = document.getElementById("w-hoofdvraag").value;
+      f.deelvragen = document.getElementById("w-deelvragen").value.split("\n").filter(Boolean);
+      f.inScope = document.getElementById("w-inscope").value.split("\n").filter(Boolean);
+      f.buitenScope = document.getElementById("w-buitenscope").value.split("\n").filter(Boolean);
+      f.aandachtspunten = document.getElementById("w-aandachtspunten").value;
+      document.querySelectorAll("[data-check]").forEach(cb => { f.checklist[cb.dataset.check] = cb.checked; });
+      expl.funnel.huidigeFase = 2;
+      saveExploratie(expl);
+      location.hash = "#/nieuwe-exploratie/" + expl.id;
+      location.reload();
+    }, false);
   }
 
   /* ---------- Netwerk ---------- */
