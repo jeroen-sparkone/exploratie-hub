@@ -12,8 +12,8 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   const store = {
-    get(k, fb) { try { const v = localStorage.getItem("ihub:" + k); return v ? JSON.parse(v) : fb; } catch { return fb; } },
-    set(k, v) { try { localStorage.setItem("ihub:" + k, JSON.stringify(v)); } catch { } }
+    get(k, fb) { try { const v = localStorage.getItem("ehub:" + k); return v ? JSON.parse(v) : fb; } catch { return fb; } },
+    set(k, v) { try { localStorage.setItem("ehub:" + k, JSON.stringify(v)); } catch { } }
   };
 
   function allProjects() { return PROJECTS.concat(store.get("extraProjects", [])); }
@@ -96,10 +96,10 @@
     "login": renderLogin,
     "onboarding": renderOnboarding,
     "home": renderHome,
-    "innovaties": renderInnovaties,
-    "project": renderProject,
-    "mijn-projecten": renderMijnProjecten,
-    "nieuw-project": renderNieuwProject,
+    "technologieen": renderTechnologieen,
+    "technologie": renderTechnologieDetail,
+    "mijn-exploraties": renderMijnExploraties,
+    "nieuwe-exploratie": renderNieuweExploratie,
     "netwerk": renderNetwerk,
     "account": renderAccount
   };
@@ -109,7 +109,7 @@
   function route() {
     const raw = location.hash.replace(/^#\/?/, "") || "login";
     const [page, param] = raw.split("/");
-    const loggedIn = sessionStorage.getItem("ihub:loggedin") === "1";
+    const loggedIn = sessionStorage.getItem("ehub:loggedin") === "1";
     if (!loggedIn && page !== "login") { location.hash = "#/login"; return; }
     if (loggedIn && (page === "login" || page === "")) { location.hash = "#/home"; return; }
     const fn = routes[page] || renderHome;
@@ -124,8 +124,8 @@
   function shell(active, content) {
     const items = [
       ["home", I.home, "Home"],
-      ["innovaties", I.bulb, "Innovaties"],
-      ["mijn-projecten", I.folder, "Mijn projecten"],
+      ["technologieen", I.bulb, "Technologieën"],
+      ["mijn-exploraties", I.folder, "Mijn exploraties"],
       ["netwerk", I.globe, "Netwerk"]
     ];
     const bottom = [
@@ -140,7 +140,7 @@
     app.innerHTML = `
       <div class="app">
         <aside class="sidebar">
-          <div class="brand">Innovatie Hub</div>
+          <div class="brand">Exploratie Hub</div>
           <nav>${items.map(link).join("")}</nav>
           <nav class="nav-bottom">${bottom.map(link).join("")}</nav>
         </aside>
@@ -157,7 +157,7 @@
         <div class="auth-body">
           <div class="auth-card">
             <div class="auth-logo">${I.logo}</div>
-            <h1>Innovatie Hub</h1>
+            <h1>Exploratie Hub</h1>
             <div class="auth-sub">Log in op je account</div>
             <form id="loginForm">
               <div class="field">
@@ -177,7 +177,7 @@
             <div class="auth-alt">Nog geen account? <a href="#" onclick="IH.toast('Registreren is nog niet beschikbaar in deze MVP');return false;">Registreer</a></div>
           </div>
         </div>
-        <div class="auth-footer">© 2026 Digicampus — demo met projectdata van digitaleoverheid.nl</div>
+        <div class="auth-footer">© 2026 — demo met representatieve technologie-exploratiedata (handmatig samengesteld)</div>
       </div>`;
     document.getElementById("pwToggle").onclick = () => {
       const pw = document.getElementById("pw");
@@ -185,7 +185,7 @@
     };
     document.getElementById("loginForm").onsubmit = e => {
       e.preventDefault();
-      sessionStorage.setItem("ihub:loggedin", "1");
+      sessionStorage.setItem("ehub:loggedin", "1");
       nav(store.get("onboarded", false) ? "#/home" : "#/onboarding");
     };
   }
