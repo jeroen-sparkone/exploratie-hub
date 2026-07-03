@@ -1,5 +1,5 @@
 /* ============================================================
-   Innovatie Hub — applicatie (SPA met hash-routing)
+   Exploratie Hub — applicatie (SPA met hash-routing)
    ============================================================ */
 
 (function () {
@@ -108,13 +108,15 @@
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, "") || "login";
-    const [page, param] = raw.split("/");
+    const [pagePart, queryStr] = raw.split("?");
+    const [page, param] = pagePart.split("/");
+    const domeinParam = queryStr ? new URLSearchParams(queryStr).get("domein") : null;
     const loggedIn = sessionStorage.getItem("ehub:loggedin") === "1";
     if (!loggedIn && page !== "login") { location.hash = "#/login"; return; }
     if (loggedIn && (page === "login" || page === "")) { location.hash = "#/home"; return; }
     const fn = routes[page] || renderHome;
     window.scrollTo(0, 0);
-    fn(param);
+    fn(param, domeinParam);
   }
 
   window.addEventListener("hashchange", route);
@@ -202,7 +204,7 @@
               <button class="icon-btn" onclick="history.back()">${I.back}</button>
               <a href="#/home" id="skip">Sla voor nu over</a>
             </div>
-            <h1>Welkom bij de Innovatie Hub</h1>
+            <h1>Welkom bij de Exploratie Hub</h1>
             <div class="auth-sub">Selecteer hier de thema's en technologieën die aansluiten bij jouw interesses</div>
             <div class="chip-cloud" id="chips">
               ${INTERESSES.slice(0, 18).map(i => `<button type="button" class="chip ${sel.has(i) ? "selected" : ""}" data-i="${esc(i)}">${sel.has(i) ? "✓" : "+"} ${esc(i)}</button>`).join("")}
@@ -211,7 +213,7 @@
             <button class="btn btn-primary" id="verder">Ga verder</button>
           </div>
         </div>
-        <div class="auth-footer">© 2026 Digicampus — demo met projectdata van digitaleoverheid.nl</div>
+        <div class="auth-footer">© 2026 — demo met representatieve technologie-exploratiedata (handmatig samengesteld)</div>
       </div>`;
 
     let expanded = false;
@@ -366,69 +368,68 @@
 
   /* ---------- Projectkaart ---------- */
 
-  function cardHtml(p, opts = {}) {
-    const c = person(p.contactId);
+  function techStats(t) {
+    const expls = EXPLORATIES.filter(e => e.technologieId === t.id);
+    const orgCount = new Set(expls.map(e => e.org)).size;
+    const statuses = [...new Set(expls.map(e => e.status))];
+    return { explCount: expls.length, orgCount, statuses };
+  }
+
+  function technologieCardHtml(t) {
+    const stats = techStats(t);
     return `
-      <div class="card pcard" data-id="${esc(p.id)}" role="link" tabindex="0" aria-label="${esc(p.title)}">
-        <div class="thumb" style="${thumbStyle(p.theme)}">${THEME_ICONS[p.theme] || ""}${tagHtml(p.theme)}</div>
+      <div class="card pcard" data-id="${esc(t.id)}" role="link" tabindex="0" aria-label="${esc(t.naam)}">
+        <div class="thumb" style="background:${DOMAIN_COLORS[t.domein]}"><span class="tag">${esc(t.domein)}</span></div>
         <div class="body">
-          <h3>${statusDot(p.status)}${esc(p.title)}</h3>
-          <div class="org">${esc(p.org)}</div>
-          <p>${esc(p.kort)}</p>
-          ${opts.labels ? `
-            <div class="labels-block">
-              <div class="lbl-title">Labels</div>
-              ${p.labels.slice(0, 4).map(l => `<span class="label-chip">${esc(l)}</span>`).join("")}
-            </div>
-            <div class="contact"><span class="avatar" style="width:26px;height:26px;font-size:10.5px;background:${c.kleur}">${initials(c.naam)}</span> ${esc(c.naam)}</div>` : ""}
+          <h3>TRL ${t.trl} · ${esc(t.naam)}</h3>
+          <div class="org">${stats.orgCount} organisatie${stats.orgCount === 1 ? "" : "s"} onderzoekt dit</div>
+          <p>${esc(t.korteBeschrijving)}</p>
+          <div class="labels-block">
+            ${t.labels.slice(0, 4).map(l => `<span class="label-chip">${esc(l)}</span>`).join("")}
+          </div>
         </div>
       </div>`;
   }
 
-  function bindCards() {
+  function bindTechCards() {
     document.querySelectorAll(".pcard[data-id]").forEach(el => {
-      const go = () => nav("#/project/" + el.dataset.id);
-      el.addEventListener("click", go);
-      el.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+      el.onclick = () => { location.hash = `#/technologie/${el.dataset.id}`; };
+      el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } };
     });
   }
 
   /* ---------- Innovaties (alle projecten) ---------- */
 
-  const innoState = { q: "", theme: "", org: "", fase: "", status: "", jaar: "", typeOrg: "", sort: "titel", view: "grid", filterOpen: false };
+  const techState = { q: "", domein: "", org: "", status: "", jaar: "", filterOpen: false, sort: "naam", view: "grid" };
 
-  function renderInnovaties() {
-    const projs = allProjects();
-    const orgs = [...new Set(projs.map(p => p.org))].sort();
-    const fases = ["Idee", "Proof of concept", "Pilot", "Implementatie", "Opgeschaald"];
-    const jaren = [...new Set(projs.map(p => p.jaar).filter(Boolean))].sort().reverse();
-    const typesOrg = [...new Set(projs.map(p => p.typeOrganisatie).filter(Boolean))].sort();
+  function renderTechnologieen(param, initialDomein) {
+    const orgs = [...new Set(EXPLORATIES.map(e => e.org))].sort();
+    const jaren = [...new Set(EXPLORATIES.map(e => e.jaar))].sort().reverse();
+    if (initialDomein) techState.domein = initialDomein;
 
-    shell("innovaties", `
+    shell("technologieen", `
       <div class="page-head">
         <div>
-          <h1 class="page-title">Innovatieprojecten</h1>
-          <div class="page-sub">Alle projecten die zijn uitgevoerd met het Innovatiebudget Digitale Overheid (bron: digitaleoverheid.nl)</div>
+          <h1 class="page-title">Technologieën</h1>
+          <div class="page-sub">Alle technologieën in de Exploratie Hub, geclassificeerd naar Trendroos-domein</div>
         </div>
       </div>
       <div class="toolbar">
-        <div class="searchbox">${I.search}<input id="q" placeholder="Zoeken" value="${esc(innoState.q)}"></div>
+        <div class="searchbox">${I.search}<input id="q" placeholder="Zoeken" value="${esc(techState.q)}"></div>
         <button class="btn btn-ghost" id="filterBtn">${I.filter} Filter</button>
         <div class="select-wrap">
           <select id="sort">
-            <option value="titel">Sorteer op: titel</option>
-            <option value="nieuwste">Sorteer op: nieuwste</option>
-            <option value="organisatie">Sorteer op: organisatie</option>
+            <option value="naam">Sorteer op: naam</option>
+            <option value="trl">Sorteer op: TRL</option>
+            <option value="orgs">Sorteer op: aantal organisaties</option>
           </select>
         </div>
       </div>
-      <div class="filter-panel ${innoState.filterOpen ? "open" : ""}" id="filterPanel">
-        <div class="select-wrap"><select id="pTheme"><option value="">Alle thema's</option>${THEMES.map(t => `<option>${esc(t)}</option>`).join("")}</select></div>
+      <div class="filter-panel ${techState.filterOpen ? "open" : ""}" id="filterPanel">
+        <div class="select-wrap"><select id="pDomein"><option value="">Alle domeinen</option>${DOMAINS.map(d => `<option>${esc(d)}</option>`).join("")}</select></div>
         <div class="select-wrap"><select id="pOrg"><option value="">Alle organisaties</option>${orgs.map(o => `<option>${esc(o)}</option>`).join("")}</select></div>
-        <div class="select-wrap"><select id="pFase"><option value="">Alle projectfases</option>${fases.map(o => `<option>${esc(o)}</option>`).join("")}</select></div>
-        <div class="select-wrap"><select id="pStatus"><option value="">Alle statussen</option>${Object.keys(STATUS_COLORS).map(o => `<option>${esc(o)}</option>`).join("")}</select></div>
-        <div class="select-wrap"><select id="pJaar"><option value="">Alle jaren</option>${jaren.map(o => `<option>${esc(o)}</option>`).join("")}</select></div>
-        <div class="select-wrap"><select id="pTypeOrg"><option value="">Alle organisatietypes</option>${typesOrg.map(o => `<option>${esc(o)}</option>`).join("")}</select></div>
+        <div class="select-wrap"><select id="pStatus"><option value="">Alle statussen</option>${Object.keys(STATUS_COLORS).map(s => `<option>${esc(s)}</option>`).join("")}</select></div>
+        <div class="select-wrap"><select id="pJaar"><option value="">Alle jaren</option>${jaren.map(j => `<option>${esc(j)}</option>`).join("")}</select></div>
       </div>
       <div class="result-bar">
         <span id="count"></span>
@@ -437,51 +438,43 @@
           <button id="vList" title="Lijstweergave">${I.listIc}</button>
         </div>
       </div>
-      <div id="results"></div>
+      <div id="results" class="${techState.view === "grid" ? "grid" : "list"}"></div>
     `);
 
-    const $ = id => document.getElementById(id);
-    $("sort").value = innoState.sort;
-    $("pTheme").value = innoState.theme; $("pOrg").value = innoState.org;
-    $("pFase").value = innoState.fase; $("pStatus").value = innoState.status;
-    $("pJaar").value = innoState.jaar; $("pTypeOrg").value = innoState.typeOrg;
+    const els = ["q", "pDomein", "pOrg", "pStatus", "pJaar", "sort"].reduce((o, id) => (o[id] = document.getElementById(id), o), {});
+    els.pDomein.value = techState.domein; els.pOrg.value = techState.org;
+    els.pStatus.value = techState.status; els.pJaar.value = techState.jaar; els.sort.value = techState.sort;
 
     function update() {
-      let list = projs.filter(p => {
-        const hay = [p.title, p.org, p.kort, p.beschrijving, p.theme, p.jaar, p.typeOrganisatie, p.plaats, ...(p.partners || []), ...(p.labels || [])].join(" ").toLowerCase();
-        return (!innoState.q || hay.includes(innoState.q.toLowerCase())) &&
-          (!innoState.theme || p.theme === innoState.theme) &&
-          (!innoState.org || p.org === innoState.org) &&
-          (!innoState.fase || p.fase === innoState.fase) &&
-          (!innoState.status || p.status === innoState.status) &&
-          (!innoState.jaar || p.jaar === innoState.jaar) &&
-          (!innoState.typeOrg || p.typeOrganisatie === innoState.typeOrg);
-      });
-      if (innoState.sort === "titel") list.sort((a, b) => a.title.localeCompare(b.title, "nl"));
-      if (innoState.sort === "nieuwste") list.sort((a, b) => (b.jaar || "").localeCompare(a.jaar || "") || parseDate(b.gepubliceerd) - parseDate(a.gepubliceerd));
-      if (innoState.sort === "organisatie") list.sort((a, b) => a.org.localeCompare(b.org, "nl"));
+      techState.q = els.q.value; techState.domein = els.pDomein.value; techState.org = els.pOrg.value;
+      techState.status = els.pStatus.value; techState.jaar = els.pJaar.value; techState.sort = els.sort.value;
 
-      $("count").textContent = `${list.length} ${list.length === 1 ? "resultaat" : "resultaten"}`;
-      $("vGrid").classList.toggle("active", innoState.view === "grid");
-      $("vList").classList.toggle("active", innoState.view === "list");
-      $("results").className = innoState.view === "grid" ? "grid" : "list";
-      $("results").innerHTML = list.length
-        ? list.map(p => cardHtml(p, { labels: true })).join("")
-        : `<div class="empty">Geen projecten gevonden. Pas je zoekopdracht of filters aan.</div>`;
-      bindCards();
+      let list = TECHNOLOGIEEN.filter(t => {
+        const matchesQ = !techState.q || (t.naam + " " + t.korteBeschrijving).toLowerCase().includes(techState.q.toLowerCase());
+        const matchesDomein = !techState.domein || t.domein === techState.domein;
+        const explsForTech = EXPLORATIES.filter(e => e.technologieId === t.id);
+        const matchesOrg = !techState.org || explsForTech.some(e => e.org === techState.org);
+        const matchesStatus = !techState.status || explsForTech.some(e => e.status === techState.status);
+        const matchesJaar = !techState.jaar || explsForTech.some(e => e.jaar === techState.jaar);
+        return matchesQ && matchesDomein && matchesOrg && matchesStatus && matchesJaar;
+      });
+
+      if (techState.sort === "trl") list.sort((a, b) => b.trl - a.trl);
+      else if (techState.sort === "orgs") list.sort((a, b) => techStats(b).orgCount - techStats(a).orgCount);
+      else list.sort((a, b) => a.naam.localeCompare(b.naam));
+
+      document.getElementById("count").textContent = `${list.length} ${list.length === 1 ? "technologie" : "technologieën"}`;
+      document.getElementById("results").innerHTML = list.length
+        ? list.map(technologieCardHtml).join("")
+        : `<div class="empty">Geen technologieën gevonden.</div>`;
+      bindTechCards();
     }
 
-    $("q").oninput = e => { innoState.q = e.target.value; update(); };
-    $("filterBtn").onclick = () => { innoState.filterOpen = !innoState.filterOpen; $("filterPanel").classList.toggle("open", innoState.filterOpen); };
-    $("sort").onchange = e => { innoState.sort = e.target.value; update(); };
-    ["pTheme", "pOrg", "pFase", "pStatus", "pJaar", "pTypeOrg"].forEach(id => {
-      $(id).onchange = e => {
-        innoState[{ pTheme: "theme", pOrg: "org", pFase: "fase", pStatus: "status", pJaar: "jaar", pTypeOrg: "typeOrg" }[id]] = e.target.value;
-        update();
-      };
-    });
-    $("vGrid").onclick = () => { innoState.view = "grid"; update(); };
-    $("vList").onclick = () => { innoState.view = "list"; update(); };
+    els.q.oninput = update; els.pDomein.onchange = update; els.pOrg.onchange = update;
+    els.pStatus.onchange = update; els.pJaar.onchange = update; els.sort.onchange = update;
+    document.getElementById("filterBtn").onclick = () => { techState.filterOpen = !techState.filterOpen; document.getElementById("filterPanel").classList.toggle("open", techState.filterOpen); };
+    document.getElementById("vGrid").onclick = () => { techState.view = "grid"; document.getElementById("results").className = "grid"; };
+    document.getElementById("vList").onclick = () => { techState.view = "list"; document.getElementById("results").className = "list"; };
     update();
   }
 
