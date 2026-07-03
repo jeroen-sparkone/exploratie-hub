@@ -388,6 +388,7 @@ button { font-family: inherit; cursor: pointer; }
   .nav-item { justify-content: center; }
   .main { margin-left: 64px; padding: 20px 16px 48px; }
   .detail-head .thumb { width: 100%; }
+  .pie-wrap { min-width: 0; width: 100%; }
 }
 
 .wizard-steps { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
