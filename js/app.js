@@ -48,6 +48,7 @@
 
   function wizardShell(expl, bodyHtml, checklistItems, onSaveAndNext, isLastFase) {
     const fase = expl.funnel.huidigeFase;
+    const checklist = expl.funnel["fase" + fase].checklist;
     shell("mijn-exploraties", `
       <a href="#/mijn-exploraties" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-bottom:14px">${I.back} Terug naar mijn exploraties</a>
       <div class="wizard-steps">
@@ -59,7 +60,7 @@
         <div id="wizardBody">${bodyHtml}</div>
         <div class="wizard-checklist">
           <h3>Checklist</h3>
-          ${checklistItems.map(([key, label]) => `<label><input type="checkbox" data-check="${esc(key)}"> ${esc(label)}</label>`).join("<br>")}
+          ${checklistItems.map(([key, label]) => `<label><input type="checkbox" data-check="${esc(key)}"${checklist[key] ? " checked" : ""}> ${esc(label)}</label>`).join("<br>")}
         </div>
         <div class="wizard-parkeerbord">
           <h3>Parkeerbord</h3>
@@ -77,18 +78,19 @@
       document.getElementById("parkeerbordList").innerHTML = expl.funnel.parkeerbord.map(p => `<li>${esc(p)}</li>`).join("");
       input.value = "";
     };
-    document.getElementById("wizardNext").onclick = () => onSaveAndNext();
+    document.getElementById("wizardNext").onclick = () => {
+      const boxes = [...document.querySelectorAll("[data-check]")];
+      if (!boxes.every(cb => cb.checked)) {
+        toast("Vink eerst de hele checklist af voordat je doorgaat naar de volgende fase");
+        return;
+      }
+      onSaveAndNext();
+    };
   }
 
   function allExploraties() { return EXPLORATIES.concat(store.get("extraExploraties", [])); }
   function initials(n) { return n.split(" ").filter(Boolean).map(w => w[0]).slice(0, 2).join("").toUpperCase(); }
   function interests() { return store.get("interests", USER.interesses); }
-
-  function parseDate(d) { // "DD-MM-JJJJ" -> sorteerbaar
-    if (!d || d === "-") return 0;
-    const [dd, mm, yy] = d.split("-").map(Number);
-    return (yy || 0) * 10000 + (mm || 0) * 100 + (dd || 0);
-  }
 
   function toast(msg) {
     let t = document.querySelector(".toast");
@@ -129,28 +131,6 @@
     lion: '<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c.5 1.4 1.6 2.2 3 2.5-.6 1-.6 2 0 3-1.2.4-2 1.2-2.3 2.4h2.8c1.5 0 2.5 1 2.5 2.5v5.1c0 2-1.3 3.5-3.3 3.5H9.3C7.3 21 6 19.5 6 17.5v-5.1C6 10.9 7 10 8.5 10h2.8C11 8.8 10.2 8 9 7.6c.6-1 .6-2 0-3 1.4-.3 2.5-1.1 3-2.6z"/></svg>'
   };
 
-  /* Thema-iconen voor projectafbeeldingen */
-  const THEME_ICONS = {
-    "Data": '<svg class="icon" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-6"/><path d="M4.5 11.5v6c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-6"/></svg>',
-    "AI": '<svg class="icon" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><rect x="6" y="7" width="12" height="11" rx="2.5"/><circle cx="9.7" cy="12" r="1.2" fill="#fff"/><circle cx="14.3" cy="12" r="1.2" fill="#fff"/><path d="M9.5 15.3h5M12 7V4.4M12 4.4a1.3 1.3 0 1 0-.1 0zM6 10.5H3.8M18 10.5h2.2"/></svg>',
-    "Cloud": '<svg class="icon" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><path d="M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18.2 10 3.8 3.8 0 0 1 17.5 18z"/></svg>',
-    "Digitale weerbaarheid": '<svg class="icon" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><path d="M12 3 5 5.5v5c0 4.6 3 8.4 7 10 4-1.6 7-5.4 7-10v-5z"/><path d="m9.3 12 2 2 3.6-4"/></svg>',
-    "Digitaal vakmanschap": '<svg class="icon" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/></svg>',
-    "Burgergericht": '<svg class="icon" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c0-3 2.5-4.8 5.5-4.8s5.5 1.8 5.5 4.8"/><circle cx="16.5" cy="9.5" r="2.4"/><path d="M16 14.6c2.6.2 4.5 1.9 4.5 4.4"/></svg>'
-  };
-
-  function thumbStyle(theme) {
-    const c = THEME_COLORS[theme] || "#888";
-    return `background: linear-gradient(135deg, ${c}cc, ${c});`;
-  }
-
-  function tagHtml(theme) {
-    return `<span class="tag" style="background:${THEME_COLORS[theme] || "#888"}">${esc(theme)}</span>`;
-  }
-
-  function statusDot(status) {
-    return `<span class="status-dot" style="background:${STATUS_COLORS[status] || "#999"}" title="${esc(status)}"></span>`;
-  }
 
   /* ---------- Router ---------- */
 
@@ -460,7 +440,7 @@
     });
   }
 
-  /* ---------- Innovaties (alle projecten) ---------- */
+  /* ---------- Technologieën (browse) ---------- */
 
   const techState = { q: "", domein: "", org: "", status: "", jaar: "", filterOpen: false, sort: "naam", view: "grid" };
 
