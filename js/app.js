@@ -244,97 +244,126 @@
 
   const homeFilters = { org: "", fase: "", status: "" };
 
-  function pieSvg(data) {
-    // data: [{label, value, color}]
-    const total = data.reduce((s, d) => s + d.value, 0) || 1;
-    const cx = 150, cy = 150, r = 105, lr = 128;
-    let angle = -Math.PI / 2;
-    let paths = "", labels = "";
-    data.forEach(d => {
-      if (!d.value) return;
-      const frac = d.value / total;
-      const a2 = angle + frac * Math.PI * 2;
-      const large = frac > .5 ? 1 : 0;
-      const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
-      const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
-      if (frac >= .999) {
-        paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${d.color}"/>`;
-      } else {
-        paths += `<path d="M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large} 1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${d.color}" stroke="#fff" stroke-width="1.5"><title>${esc(d.label)}: ${d.value}</title></path>`;
+  function polarPoint(cx, cy, r, deg) {
+    const rad = (deg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+  }
+  function wheelArcPath(cx, cy, rOuter, rInner, startDeg, endDeg) {
+    const [x1, y1] = polarPoint(cx, cy, rOuter, startDeg);
+    const [x2, y2] = polarPoint(cx, cy, rOuter, endDeg);
+    const [x3, y3] = polarPoint(cx, cy, rInner, endDeg);
+    const [x4, y4] = polarPoint(cx, cy, rInner, startDeg);
+    const large = endDeg - startDeg > 180 ? 1 : 0;
+    return `M${x1.toFixed(1)},${y1.toFixed(1)} A${rOuter},${rOuter} 0 ${large} 1 ${x2.toFixed(1)},${y2.toFixed(1)} L${x3.toFixed(1)},${y3.toFixed(1)} A${rInner},${rInner} 0 ${large} 0 ${x4.toFixed(1)},${y4.toFixed(1)} Z`;
+  }
+
+  function trendroosWheel(counts) {
+    // counts: { domein: number }
+    const cx = 170, cy = 170;
+    const rInnerOuter = 145, rInnerInner = 70;   // domain ring
+    const rOuterOuter = 163, rOuterInner = 149;  // cluster ring
+    const step = 360 / DOMAINS.length;
+    let start = 0, domainSegs = "", clusterSegs = "", labels = "";
+    const clusters = [];
+    DOMAINS.forEach(d => {
+      const end = start + step;
+      const color = DOMAIN_COLORS[d];
+      const n = counts[d] || 0;
+      domainSegs += `<path d="${wheelArcPath(cx, cy, rInnerOuter, rInnerInner, start, end)}" fill="${color}" stroke="#fff" stroke-width="1.5"><title>${esc(d)}: ${n}</title></path>`;
+      if (n) {
+        const [nx, ny] = polarPoint(cx, cy, (rInnerOuter + rInnerInner) / 2, (start + end) / 2);
+        labels += `<text x="${nx.toFixed(1)}" y="${ny.toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">${n}</text>`;
       }
-      const mid = (angle + a2) / 2;
-      const lx = cx + lr * Math.cos(mid), ly = cy + lr * Math.sin(mid);
-      const anchor = Math.cos(mid) > .25 ? "start" : (Math.cos(mid) < -.25 ? "end" : "middle");
-      labels += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" font-size="11.5" fill="#1a1f26">${esc(d.label)} (${d.value})</text>`;
-      angle = a2;
+      let cl = clusters.find(c => c.name === DOMAIN_CLUSTERS[d]);
+      if (!cl) { cl = { name: DOMAIN_CLUSTERS[d], start, color }; clusters.push(cl); }
+      cl.end = end;
+      start = end;
     });
-    return `<svg viewBox="-140 -14 590 330" width="100%" style="max-width:560px" role="img" aria-label="Projecten per thema">${paths}${labels}</svg>`;
+    clusters.forEach(cl => {
+      clusterSegs += `<path d="${wheelArcPath(cx, cy, rOuterOuter, rOuterInner, cl.start + 2, cl.end - 2)}" fill="${cl.color}" opacity="0.55"><title>${esc(cl.name)}</title></path>`;
+    });
+    return `<svg viewBox="0 0 340 340" width="100%" style="max-width:320px;display:block;margin:0 auto" aria-hidden="true">${domainSegs}${clusterSegs}${labels}</svg>`;
+  }
+
+  function domainListHtml(counts, activeDomain) {
+    const byCluster = {};
+    DOMAINS.forEach(d => { (byCluster[DOMAIN_CLUSTERS[d]] = byCluster[DOMAIN_CLUSTERS[d]] || []).push(d); });
+    return `<div class="domain-list">${Object.entries(byCluster).map(([cluster, domains]) => `
+      <div class="domain-cluster">
+        <div class="domain-cluster-title">${esc(cluster)}</div>
+        <div class="domain-chips">${domains.map(d => `
+          <button type="button" class="domain-chip${activeDomain === d ? " active" : ""}" style="background:${DOMAIN_COLORS[d]}" data-domain="${esc(d)}">${esc(d)} · ${counts[d] || 0}</button>
+        `).join("")}</div>
+      </div>`).join("")}</div>`;
   }
 
   function renderHome() {
-    const projs = allProjects();
-    const orgs = [...new Set(projs.map(p => p.org))].sort();
-    const fases = ["Idee", "Proof of concept", "Pilot", "Implementatie", "Opgeschaald"];
+    const orgs = [...new Set(EXPLORATIES.map(e => e.org))].sort();
     const statuses = Object.keys(STATUS_COLORS);
+    const jaren = [...new Set(EXPLORATIES.map(e => e.jaar))].sort().reverse();
 
     const my = interests();
-    const rec = projs.filter(p =>
-      p.labels.some(l => my.includes(l)) || my.includes(p.theme) ||
-      (my.includes("Burgergericht") && p.theme === "Burgergericht")
-    ).slice(0, 10);
-    const recList = rec.length ? rec : projs.slice(0, 8);
+    const rec = TECHNOLOGIEEN.filter(t => t.labels.some(l => my.includes(l)) || my.includes(t.domein)).slice(0, 10);
+    const recList = rec.length ? rec : TECHNOLOGIEEN.slice(0, 8);
 
     shell("home", `
       <h1 class="page-title" style="margin-bottom:22px">Welkom ${esc(USER.voornaam)}</h1>
-      <div class="demo-banner">Projectdata afkomstig van digitaleoverheid.nl (Innovatiebudget Digitale Overheid). Thema, labels, status en fase zijn redactioneel afgeleid uit de projectbeschrijvingen.</div>
+      <div class="demo-banner">Technologie- en exploratiedata is representatief en handmatig samengesteld op basis van publieke bronnen — geen live koppeling. Domeinindeling volgt de Rijksbrede Trendverkenning (mei 2026).</div>
 
       <div class="card dash-card">
         <div class="head">
           <div>
-            <h2 id="dashTitle"></h2>
-            <div class="sub">De thema's zijn verdeeld op basis van NDS-thema's (Nederlandse Digitaliseringsstrategie)</div>
+            <h2>Technologieën per Trendroos-domein</h2>
+            <div class="sub">Op basis van de 14 sub-domeinen uit de Rijksbrede Trendverkenning, gegroepeerd in 7 clusters</div>
           </div>
-          <a href="#/innovaties">Bekijk alle projecten</a>
+          <a href="#/technologieen">Bekijk alle technologieën</a>
         </div>
         <div class="dash-body">
-          <div class="pie-wrap" id="pie"></div>
+          <div class="pie-wrap" id="wheel"></div>
           <div class="dash-filters">
             <div class="select-wrap"><select id="fOrg"><option value="">Filter op organisatie</option>${orgs.map(o => `<option>${esc(o)}</option>`).join("")}</select></div>
-            <div class="select-wrap"><select id="fFase"><option value="">Filter op projectfase</option>${fases.map(o => `<option>${esc(o)}</option>`).join("")}</select></div>
-            <div class="select-wrap"><select id="fStatus"><option value="">Filter op projectstatus</option>${statuses.map(o => `<option>${esc(o)}</option>`).join("")}</select></div>
+            <div class="select-wrap"><select id="fStatus"><option value="">Filter op status</option>${statuses.map(s => `<option>${esc(s)}</option>`).join("")}</select></div>
+            <div class="select-wrap"><select id="fJaar"><option value="">Filter op jaar</option>${jaren.map(j => `<option>${esc(j)}</option>`).join("")}</select></div>
             <button class="reset" id="fReset">Reset filters ${I.reset}</button>
           </div>
         </div>
+        <div id="domainListWrap"></div>
       </div>
 
       <div class="section-head">
         <h2>Gebaseerd op jouw interesses</h2>
         <a href="#/account">Wijzig interesses ${I.pencil}</a>
       </div>
-      <div class="hscroll">${recList.map(cardHtml).join("")}</div>
+      <div class="hscroll">${recList.map(t => technologieCardHtml(t)).join("")}</div>
     `);
 
-    const fOrg = document.getElementById("fOrg"), fFase = document.getElementById("fFase"), fStatus = document.getElementById("fStatus");
-    fOrg.value = homeFilters.org; fFase.value = homeFilters.fase; fStatus.value = homeFilters.status;
+    const fOrg = document.getElementById("fOrg"), fStatus = document.getElementById("fStatus"), fJaar = document.getElementById("fJaar");
+    let activeDomain = "";
+
+    function counts() {
+      const filtered = EXPLORATIES.filter(e =>
+        (!fOrg.value || e.org === fOrg.value) &&
+        (!fStatus.value || e.status === fStatus.value) &&
+        (!fJaar.value || e.jaar === fJaar.value)
+      );
+      const techIds = new Set(filtered.map(e => e.technologieId));
+      const c = {};
+      TECHNOLOGIEEN.forEach(t => { if (techIds.has(t.id)) c[t.domein] = (c[t.domein] || 0) + 1; });
+      return c;
+    }
 
     function update() {
-      homeFilters.org = fOrg.value; homeFilters.fase = fFase.value; homeFilters.status = fStatus.value;
-      const filtered = projs.filter(p =>
-        (!homeFilters.org || p.org === homeFilters.org) &&
-        (!homeFilters.fase || p.fase === homeFilters.fase) &&
-        (!homeFilters.status || p.status === homeFilters.status)
-      );
-      const data = THEMES.map(t => ({
-        label: t, color: THEME_COLORS[t],
-        value: filtered.filter(p => p.theme === t).length
-      })).filter(d => d.value > 0);
-      document.getElementById("dashTitle").textContent = `Alle innovatieprojecten (${filtered.length}) per thema`;
-      document.getElementById("pie").innerHTML = filtered.length ? pieSvg(data) : `<div class="empty">Geen projecten gevonden met deze filters.</div>`;
+      const c = counts();
+      document.getElementById("wheel").innerHTML = trendroosWheel(c);
+      document.getElementById("domainListWrap").innerHTML = domainListHtml(c, activeDomain);
+      document.getElementById("domainListWrap").querySelectorAll(".domain-chip").forEach(btn => {
+        btn.onclick = () => { location.hash = `#/technologieen?domein=${encodeURIComponent(btn.dataset.domain)}`; };
+      });
     }
-    fOrg.onchange = fFase.onchange = fStatus.onchange = update;
-    document.getElementById("fReset").onclick = () => { fOrg.value = fFase.value = fStatus.value = ""; update(); };
+
+    fOrg.onchange = update; fStatus.onchange = update; fJaar.onchange = update;
+    document.getElementById("fReset").onclick = () => { fOrg.value = ""; fStatus.value = ""; fJaar.value = ""; update(); };
     update();
-    bindCards();
   }
 
   /* ---------- Projectkaart ---------- */

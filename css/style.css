@@ -370,6 +370,14 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 8px; padding: 8px 14px; font-size: 12.5px; margin-bottom: 20px;
 }
 
+.domain-list { margin-top: 18px; }
+.domain-cluster { margin-bottom: 12px; }
+.domain-cluster-title { font-size: 11.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .02em; }
+.domain-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.domain-chip { border: none; border-radius: 14px; color: #fff; font-size: 12px; padding: 5px 11px; cursor: pointer; opacity: .85; }
+.domain-chip:hover, .domain-chip.active { opacity: 1; outline: 2px solid #1a1f26; outline-offset: 1px; }
+.domain-chip:focus-visible { outline: 2px solid #1a1f26; outline-offset: 1px; }
+
 /* ---------- Responsief ---------- */
 
 @media (max-width: 860px) {
