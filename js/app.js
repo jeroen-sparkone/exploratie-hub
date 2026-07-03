@@ -242,8 +242,6 @@
 
   /* ---------- Home (dashboard) ---------- */
 
-  const homeFilters = { org: "", fase: "", status: "" };
-
   function polarPoint(cx, cy, r, deg) {
     const rad = (deg - 90) * Math.PI / 180;
     return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
