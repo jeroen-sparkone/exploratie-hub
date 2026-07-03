@@ -783,6 +783,95 @@
     }, false);
   }
 
+  function renderFase2(expl) {
+    const f = expl.funnel.fase2;
+    const body = `
+      <div class="field"><label class="req">Omschrijving trend</label><textarea id="w-omschrijving">${esc(f.omschrijving)}</textarea></div>
+      <div class="field"><label class="req">Definitie trend</label><textarea id="w-definitie">${esc(f.definitie)}</textarea></div>
+      <div class="field"><label>Bronnen bij de definitie (titel — organisatie — jaar — link, één per regel)</label><textarea id="w-defbronnen">${esc(f.definitieBronnen.map(b => `${b.titel} — ${b.organisatie} — ${b.jaar} — ${b.link}`).join("\n"))}</textarea></div>
+      <div class="field"><label>Toepassingen (beschrijving — link, één per regel; markeer onzekere claims met (niet geverifieerd))</label><textarea id="w-toepassingen">${esc(f.toepassingen.map(t => `${t.beschrijving} — ${t.link}`).join("\n"))}</textarea></div>
+      <div class="row2">
+        <div class="field"><label>Kansen — korte termijn (één per regel)</label><textarea id="w-kansen-kort">${esc(f.kansenKort.join("\n"))}</textarea></div>
+        <div class="field"><label>Kansen — lange termijn (één per regel)</label><textarea id="w-kansen-lang">${esc(f.kansenLang.join("\n"))}</textarea></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Risico's — korte termijn (één per regel)</label><textarea id="w-risicos-kort">${esc(f.risicosKort.join("\n"))}</textarea></div>
+        <div class="field"><label>Risico's — lange termijn (één per regel)</label><textarea id="w-risicos-lang">${esc(f.risicosLang.join("\n"))}</textarea></div>
+      </div>
+    `;
+    wizardShell(expl, body, [
+      ["omschrevenGedefinieerd", "Trend omschreven en gedefinieerd"],
+      ["toepassingenBeschreven", "Toepassingen van de trend beschreven"],
+      ["kansenRisicos", "Kansen en risico's beschreven"]
+    ], () => {
+      f.omschrijving = document.getElementById("w-omschrijving").value;
+      f.definitie = document.getElementById("w-definitie").value;
+      f.definitieBronnen = document.getElementById("w-defbronnen").value.split("\n").filter(Boolean).map(line => {
+        const [titel, organisatie, jaar, link] = line.split("—").map(s => (s || "").trim());
+        return { titel, organisatie, jaar, link };
+      });
+      f.toepassingen = document.getElementById("w-toepassingen").value.split("\n").filter(Boolean).map(line => {
+        const [beschrijving, link] = line.split("—").map(s => (s || "").trim());
+        return { beschrijving, link };
+      });
+      f.kansenKort = document.getElementById("w-kansen-kort").value.split("\n").filter(Boolean);
+      f.kansenLang = document.getElementById("w-kansen-lang").value.split("\n").filter(Boolean);
+      f.risicosKort = document.getElementById("w-risicos-kort").value.split("\n").filter(Boolean);
+      f.risicosLang = document.getElementById("w-risicos-lang").value.split("\n").filter(Boolean);
+      document.querySelectorAll("[data-check]").forEach(cb => { f.checklist[cb.dataset.check] = cb.checked; });
+      expl.funnel.huidigeFase = 3;
+      saveExploratie(expl);
+      location.hash = "#/nieuwe-exploratie/" + expl.id;
+      location.reload();
+    }, false);
+  }
+
+  function renderFase3(expl) {
+    const f = expl.funnel.fase3;
+    const body = `
+      <div class="field"><label>Expert-interviews (naam — rol/organisatie — belangrijkste uitkomsten, één per regel, minimaal 2)</label><textarea id="w-interviews">${esc(f.interviews.map(i => `${i.naam} — ${i.rolOrganisatie} — ${i.uitkomsten}`).join("\n"))}</textarea></div>
+      <div class="field"><label class="req">Meerwaarde voor de organisatie</label><textarea id="w-mw-org">${esc(f.meerwaarde.organisatie)}</textarea></div>
+      <div class="field"><label class="req">Meerwaarde voor de medewerker</label><textarea id="w-mw-medewerker">${esc(f.meerwaarde.medewerker)}</textarea></div>
+      <div class="field"><label class="req">Meerwaarde voor de burger</label><textarea id="w-mw-burger">${esc(f.meerwaarde.burger)}</textarea></div>
+      <div class="field"><label>Mini-test — opzet en succescriteria</label><textarea id="w-test-opzet">${esc(f.miniTest.opzet)}</textarea></div>
+      <div class="field"><label>Mini-test — resultaten</label><textarea id="w-test-resultaten">${esc(f.miniTest.resultaten)}</textarea></div>
+      <div class="field"><label>Mini-test — conclusie en aanbeveling</label><textarea id="w-test-conclusie">${esc(f.miniTest.conclusie)}</textarea></div>
+      <div class="field"><label>Bestaande initiatieven en ervaringen in de organisatie</label><textarea id="w-bestaande">${esc(f.bestaandeInitiatieven)}</textarea></div>
+      <div class="field"><label class="req">Conclusie op de hoofdvraag</label><textarea id="w-conclusie-hoofd">${esc(f.conclusieHoofdvraag)}</textarea></div>
+      <div class="field"><label>Conclusie per deelvraag (één per regel)</label><textarea id="w-conclusie-deel">${esc(f.conclusieDeelvragen.join("\n"))}</textarea></div>
+      <div class="field"><label class="req">Vervolgstatus voor deze exploratie</label>
+        <div class="select-wrap"><select id="w-status">${["Pilot", "Opgeschaald", "Gestopt", "Niet opgepakt"].map(s => `<option${expl.status === s ? " selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
+      </div>
+    `;
+    wizardShell(expl, body, [
+      ["interviewsGedaan", "Expert interviews gedaan"],
+      ["meerwaardeBeschreven", "Meerwaarde beschreven"],
+      ["initiatievenOnderzocht", "Bestaande initiatieven en ervaringen onderzocht"],
+      ["conclusieGeformuleerd", "Conclusie exploratie geformuleerd"]
+    ], () => {
+      f.interviews = document.getElementById("w-interviews").value.split("\n").filter(Boolean).map(line => {
+        const [naam, rolOrganisatie, uitkomsten] = line.split("—").map(s => (s || "").trim());
+        return { naam, rolOrganisatie, uitkomsten };
+      });
+      f.meerwaarde.organisatie = document.getElementById("w-mw-org").value;
+      f.meerwaarde.medewerker = document.getElementById("w-mw-medewerker").value;
+      f.meerwaarde.burger = document.getElementById("w-mw-burger").value;
+      f.miniTest.opzet = document.getElementById("w-test-opzet").value;
+      f.miniTest.resultaten = document.getElementById("w-test-resultaten").value;
+      f.miniTest.conclusie = document.getElementById("w-test-conclusie").value;
+      f.bestaandeInitiatieven = document.getElementById("w-bestaande").value;
+      f.conclusieHoofdvraag = document.getElementById("w-conclusie-hoofd").value;
+      f.conclusieDeelvragen = document.getElementById("w-conclusie-deel").value.split("\n").filter(Boolean);
+      document.querySelectorAll("[data-check]").forEach(cb => { f.checklist[cb.dataset.check] = cb.checked; });
+      expl.status = document.getElementById("w-status").value;
+      expl.uitkomst = f.conclusieHoofdvraag;
+      expl.funnel.huidigeFase = 4;
+      saveExploratie(expl);
+      location.hash = "#/nieuwe-exploratie/" + expl.id;
+      location.reload();
+    }, false);
+  }
+
   /* ---------- Netwerk ---------- */
 
   const netState = { q: "" };
