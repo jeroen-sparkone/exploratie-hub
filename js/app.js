@@ -81,8 +81,6 @@
   }
 
   function allExploraties() { return EXPLORATIES.concat(store.get("extraExploraties", [])); }
-  function getProject(id) { return allProjects().find(p => p.id === id); }
-  function person(id) { return PEOPLE.find(p => p.id === id) || PEOPLE[0]; }
   function initials(n) { return n.split(" ").filter(Boolean).map(w => w[0]).slice(0, 2).join("").toUpperCase(); }
   function interests() { return store.get("interests", USER.interesses); }
 
@@ -924,11 +922,11 @@
       <div class="page-head">
         <div>
           <h1 class="page-title">Netwerk</h1>
-          <div class="page-sub">Vind de projectteams achter de innovatieprojecten en leg contact via de regievoerende organisatie</div>
+          <div class="page-sub">Vind de teams achter technologie-exploraties en leg contact via de organisatie</div>
         </div>
       </div>
       <div class="toolbar">
-        <div class="searchbox">${I.search}<input id="q" placeholder="Zoek op naam, organisatie, rol/functie of expertise" value="${esc(netState.q)}"></div>
+        <div class="searchbox">${I.search}<input id="q" placeholder="Zoek op naam, organisatie, rol of expertise" value="${esc(netState.q)}"></div>
       </div>
       <div class="result-bar"><span id="count"></span></div>
       <div class="people-grid" id="results"></div>
@@ -936,7 +934,7 @@
 
     function update() {
       const q = netState.q.toLowerCase();
-      const list = PEOPLE.filter(p => !q || [p.naam, p.org, p.rol, ...(p.expertise || [])].join(" ").toLowerCase().includes(q));
+      const list = TEAMS.filter(p => !q || [p.naam, p.org, p.rol, ...(p.expertise || [])].join(" ").toLowerCase().includes(q));
       document.getElementById("count").textContent = `${list.length} ${list.length === 1 ? "resultaat" : "resultaten"}`;
       document.getElementById("results").innerHTML = list.length ? list.map(p => `
         <div class="card person-card">
@@ -949,9 +947,9 @@
               ${p.expertise.slice(0, 3).map(x => `<span class="label-chip">${esc(x)}</span>`).join("")}
               ${p.expertise.length > 3 ? `<span class="meta">+${p.expertise.length - 3}</span>` : ""}
             </div>
-            <div style="margin-top:9px">${p.email ? `<a href="mailto:${esc(p.email)}" style="font-size:12.5px">${esc(p.email)}</a>` : `<span style="font-size:12.5px;color:var(--text-muted)">Betrokken bij: ${esc(p.betrokkenBij)}</span>`}</div>
+            <div style="margin-top:9px"><span style="font-size:12.5px;color:var(--text-muted)">Betrokken bij: ${esc(p.betrokkenBij)}</span></div>
           </div>
-        </div>`).join("") : `<div class="empty">Geen personen gevonden.</div>`;
+        </div>`).join("") : `<div class="empty">Geen teams gevonden.</div>`;
     }
     document.getElementById("q").oninput = e => { netState.q = e.target.value; update(); };
     update();
