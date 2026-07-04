@@ -243,7 +243,7 @@
         <div class="auth-body">
           <div class="auth-card wide">
             <div class="onb-top">
-              <button class="icon-btn" onclick="history.back()">${I.back}</button>
+              <button class="icon-btn" onclick="history.back()" aria-label="Terug">${I.back}</button>
               <a href="#/home" id="skip">Sla voor nu over</a>
             </div>
             <h1>Welkom bij de Exploratie Hub</h1>
@@ -476,8 +476,8 @@
       <div class="result-bar">
         <span id="count"></span>
         <div class="view-toggle">
-          <button id="vGrid" title="Rasterweergave">${I.grid}</button>
-          <button id="vList" title="Lijstweergave">${I.listIc}</button>
+          <button id="vGrid" title="Rasterweergave" aria-label="Rasterweergave">${I.grid}</button>
+          <button id="vList" title="Lijstweergave" aria-label="Lijstweergave">${I.listIc}</button>
         </div>
       </div>
       <div id="results" class="${techState.view === "grid" ? "grid" : "list"}"></div>

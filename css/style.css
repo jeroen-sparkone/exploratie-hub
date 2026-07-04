@@ -202,6 +202,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .pcard { display: flex; flex-direction: column; overflow: hidden; cursor: pointer; transition: box-shadow .12s ease, transform .12s ease; }
 .pcard:hover { box-shadow: 0 4px 14px rgba(16,24,40,.12); transform: translateY(-1px); }
+.pcard:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
 .pcard .thumb { position: relative; height: 128px; display: flex; align-items: center; justify-content: center; }
 .pcard .thumb svg.icon { opacity: .9; }
 .pcard .thumb .tag { position: absolute; top: 10px; left: 10px; }
