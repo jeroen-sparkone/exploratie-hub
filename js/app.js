@@ -547,14 +547,18 @@
     `);
 
     function renderOrgsTab() {
-      return expls.length ? `<div class="grid">${expls.map(e => `
+      if (!expls.length) return `<div class="empty">Nog geen exploraties bekend voor deze technologie.</div>`;
+      return `
+        ${kompasSummaryHtml(expls)}
+        <div class="grid">${expls.map(e => `
         <div class="card">
           <h3>${esc(e.org)}</h3>
           <div class="org">${esc(e.typeOrganisatie)} · ${esc(e.jaar)} · <span style="color:${STATUS_COLORS[e.status]}">${esc(e.status)}</span></div>
+          ${kompasBadgeHtml(e)}
           <p>${esc(e.samenvatting)}</p>
           ${e.uitkomst ? `<p><strong>Uitkomst:</strong> ${esc(e.uitkomst)}</p>` : ""}
           ${e.bron ? `<a href="${esc(e.bron)}" target="_blank" rel="noopener">Bron ${I.back}</a>` : ""}
-        </div>`).join("")}</div>` : `<div class="empty">Nog geen exploraties bekend voor deze technologie.</div>`;
+        </div>`).join("")}</div>`;
     }
     function renderSimilarTab() {
       return similar.length ? `<div class="hscroll">${similar.map(technologieCardHtml).join("")}</div>` : `<div class="empty">Geen soortgelijke technologieën gevonden.</div>`;
@@ -612,6 +616,24 @@
         ${others.length ? `<div class="kompas-orgs" style="display:${cur === "samen" || cur === "doorgaan" ? "block" : "none"}">
           ${others.map(o => `<label><input type="checkbox" value="${esc(o)}"${curOrgs.includes(o) ? " checked" : ""}> ${esc(o)}</label>`).join("")}
         </div>` : ""}
+      </div>`;
+  }
+
+  function kompasSummaryHtml(expls) {
+    const order = ["wel", "nogniet", "pastniet", "nietrelevant", "samen", "doorgaan"];
+    const counts = {};
+    order.forEach(k => { counts[k] = 0; });
+    let unclassified = 0;
+    expls.forEach(e => { if (e.kompas) counts[e.kompas.positie]++; else unclassified++; });
+    const used = order.filter(k => counts[k] > 0);
+    if (!used.length) return unclassified ? `<div class="sub">Nog geen van de ${unclassified} exploraties geclassificeerd op kompaspositie.</div>` : "";
+    const segments = used.map(k => `<div class="kompas-segment" style="flex:${counts[k]};background:${KOMPAS_COLORS[k]};color:${KOMPAS_TEXT_COLORS[k]}" title="${esc(KOMPAS_LABELS[k])}: ${counts[k]}">${counts[k]}</div>`).join("");
+    const legend = used.map(k => `<span><span class="kompas-dot" style="background:${KOMPAS_COLORS[k]}"></span>${esc(KOMPAS_LABELS[k])} (${counts[k]})</span>`).join("");
+    return `
+      <div class="kompas-summary">
+        <div class="kompas-bar">${segments}</div>
+        <div class="kompas-legend">${legend}</div>
+        ${unclassified ? `<div class="sub">${unclassified} exploratie${unclassified === 1 ? "" : "s"} nog niet geclassificeerd</div>` : ""}
       </div>`;
   }
 
