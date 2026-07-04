@@ -44,7 +44,9 @@ en nieuw aangemaakte technologieën worden lokaal in de browser bewaard
   organisatie/status/jaar, aanbevelingen op interesses
 - **Technologieën** — alle technologieën, zoeken/filteren/sorteren,
   raster-/lijstweergave
-- **Technologie-detail** — TRL, wie onderzoekt dit, soortgelijke
+- **Technologie-detail** — TRL, wie onderzoekt dit (incl. kompas-overzicht:
+  welke organisaties dit oppakken, nog niet oppakken, niet relevant vinden,
+  samen doen of voortbouwen op een andere organisatie), soortgelijke
   technologieën
 - **Mijn exploraties** — eigen exploraties beheren, 5-fase Novum-wizard
   (Trend kiezen → Focus kiezen → Informatie verzamelen → Waarde bepalen →
