@@ -398,3 +398,9 @@ button { font-family: inherit; cursor: pointer; }
 .wizard-step.done { background: #d7f5df; color: #1b5e3a; }
 .wizard-checklist, .wizard-parkeerbord { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
 .wizard-checklist label { display: block; font-size: 13px; margin-bottom: 6px; }
+
+.kompas-badge { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; }
+.kompas-badge-row { margin: 8px 0 4px; }
+.kompas-edit { margin-top: 8px; }
+.kompas-orgs { margin-top: 6px; font-size: 12.5px; }
+.kompas-orgs label { display: block; margin-bottom: 4px; }

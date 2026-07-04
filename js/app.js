@@ -582,6 +582,39 @@
     return fase >= 5 ? `<span class="label-chip">Funnel afgerond</span>` : `<span class="label-chip">Fase ${fase} van 5</span>`;
   }
 
+  function kompasBadgeHtml(e) {
+    if (!e.kompas) return "";
+    const label = KOMPAS_LABELS[e.kompas.positie];
+    const isRelational = e.kompas.positie === "samen" || e.kompas.positie === "doorgaan";
+    const suffix = isRelational && e.kompas.gekoppeldeOrgs.length ? ": " + e.kompas.gekoppeldeOrgs.join(", ") : "";
+    return `<span class="kompas-badge" style="background:${KOMPAS_COLORS[e.kompas.positie]};color:${KOMPAS_TEXT_COLORS[e.kompas.positie]}">${esc(label + suffix)}</span>`;
+  }
+
+  function saveKompas(id, positie, gekoppeldeOrgs) {
+    const e = allExploraties().find(x => x.id === id);
+    if (!e) return;
+    e.kompas = positie ? { positie, gekoppeldeOrgs: (positie === "samen" || positie === "doorgaan") ? gekoppeldeOrgs : [] } : null;
+    saveExploratie(e);
+  }
+
+  function kompasEditHtml(e, allExpls) {
+    const others = [...new Set(allExpls.filter(o => o.technologieId === e.technologieId && o.org !== e.org).map(o => o.org))];
+    const cur = e.kompas ? e.kompas.positie : "";
+    const curOrgs = e.kompas ? e.kompas.gekoppeldeOrgs : [];
+    const options = [["", "— Kies kompaspositie —"], ["wel", "Wel doen"], ["nogniet", "Nog niet"], ["pastniet", "Past niet bij ons"], ["nietrelevant", "Niet relevant"]];
+    if (others.length) {
+      options.push(["samen", "Samen doen met"]);
+      options.push(["doorgaan", "Doorgaan op resultaten van"]);
+    }
+    return `
+      <div class="kompas-edit" data-exploratie-id="${esc(e.id)}">
+        <div class="select-wrap"><select class="kompas-select">${options.map(([v, l]) => `<option value="${esc(v)}"${cur === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
+        ${others.length ? `<div class="kompas-orgs" style="display:${cur === "samen" || cur === "doorgaan" ? "block" : "none"}">
+          ${others.map(o => `<label><input type="checkbox" value="${esc(o)}"${curOrgs.includes(o) ? " checked" : ""}> ${esc(o)}</label>`).join("")}
+        </div>` : ""}
+      </div>`;
+  }
+
   function renderMijnExploraties() {
     const mine = allExploraties().filter(e => e.mine);
     const tabs = ["Alle", "Onderzoekt", "Pilot", "Opgeschaald", "Gestopt", "Niet opgepakt"];
@@ -605,6 +638,7 @@
     `);
 
     function update() {
+      const mine = allExploraties().filter(e => e.mine);
       let list = mine.filter(e =>
         (mijnState.tab === "Alle" || e.status === mijnState.tab) &&
         (!mijnState.q || (e.samenvatting + " " + e.org).toLowerCase().includes(mijnState.q.toLowerCase()))
@@ -616,10 +650,25 @@
               <h3>${esc(t ? t.naam : e.technologieId)} ${funnelBadge(e)}</h3>
               <div class="org">${esc(e.org)} · <span style="color:${STATUS_COLORS[e.status]}">${esc(e.status)}</span></div>
               <p>${esc(e.samenvatting || "Nog geen samenvatting — werk de exploratie verder uit.")}</p>
+              <div class="kompas-badge-row">${kompasBadgeHtml(e)}</div>
+              ${kompasEditHtml(e, allExploraties())}
               <a href="#/nieuwe-exploratie/${esc(e.id)}">Verder werken ${I.pencil}</a>
             </div>`;
           }).join("")
         : `<div class="empty">Geen exploraties in deze categorie.</div>`;
+      document.querySelectorAll(".kompas-edit").forEach(container => {
+        const id = container.dataset.exploratieId;
+        const select = container.querySelector(".kompas-select");
+        const orgsDiv = container.querySelector(".kompas-orgs");
+        const applyChange = () => {
+          const positie = select.value;
+          const checked = orgsDiv ? [...orgsDiv.querySelectorAll("input:checked")].map(cb => cb.value) : [];
+          saveKompas(id, positie, checked);
+          update();
+        };
+        select.onchange = applyChange;
+        if (orgsDiv) orgsDiv.querySelectorAll("input").forEach(cb => { cb.onchange = applyChange; });
+      });
     }
     document.getElementById("stabs").addEventListener("click", e => {
       const b = e.target.closest("button[data-t]"); if (!b) return;
@@ -636,7 +685,7 @@
   function renderNieuweExploratie(param) {
     let expl = param ? allExploraties().find(x => x.id === param) : null;
     if (!expl) {
-      expl = { id: "expl-" + Date.now(), technologieId: "", org: USER.org, typeOrganisatie: "Rijksoverheid", status: "Onderzoekt", jaar: String(new Date().getFullYear()), samenvatting: "", uitkomst: "", bron: "", team: USER.afdeling, mine: true, funnel: emptyFunnel() };
+      expl = { id: "expl-" + Date.now(), technologieId: "", org: USER.org, typeOrganisatie: "Rijksoverheid", status: "Onderzoekt", jaar: String(new Date().getFullYear()), samenvatting: "", uitkomst: "", bron: "", team: USER.afdeling, mine: true, funnel: emptyFunnel(), kompas: null };
       saveExploratie(expl);
       location.hash = "#/nieuwe-exploratie/" + expl.id;
       return;
