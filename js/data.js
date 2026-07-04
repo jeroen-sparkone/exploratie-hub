@@ -36,20 +36,31 @@ const DOMAIN_CLUSTERS = {
 };
 
 const DOMAIN_COLORS = {
-  "Demografie": "#1B3A6B", "Gezondheid": "#2E86C1", "Geopolitiek": "#6FCF97",
-  "Veiligheid": "#8A9A2A", "Economie": "#2E8B57", "Arbeidsmarkt": "#1B5E3A",
+  "Demografie": "#1B3A6B", "Gezondheid": "#2978AD", "Geopolitiek": "#6FCF97",
+  "Veiligheid": "#8A9A2A", "Economie": "#297D4E", "Arbeidsmarkt": "#1B5E3A",
   "Technologie": "#6B4226", "Kunstmatige intelligentie": "#F5C518",
   "Kansengelijkheid": "#F2A93B", "Sociale cohesie": "#E8730D", "Klimaat": "#D6412F",
   "Energie": "#F291B5", "Fysieke leefomgeving": "#C2186D", "Rechtsstaat": "#D6146E",
   "Democratie": "#3B1F6B"
 };
 
+// Tekstkleur per domein voor voldoende contrast (WCAG AA, ≥4.5:1) op DOMAIN_COLORS-achtergrond
+const DOMAIN_TEXT_COLORS = {
+  "Demografie": "#fff", "Gezondheid": "#fff", "Geopolitiek": "#1a1f26",
+  "Veiligheid": "#1a1f26", "Economie": "#fff", "Arbeidsmarkt": "#fff",
+  "Technologie": "#fff", "Kunstmatige intelligentie": "#1a1f26",
+  "Kansengelijkheid": "#1a1f26", "Sociale cohesie": "#1a1f26", "Klimaat": "#fff",
+  "Energie": "#1a1f26", "Fysieke leefomgeving": "#fff", "Rechtsstaat": "#fff",
+  "Democratie": "#fff"
+};
+
+// Waarden aangepast t.o.v. het rapport-wiel voor voldoende contrast (WCAG AA, ≥4.5:1) als tekstkleur op wit
 const STATUS_COLORS = {
-  "Onderzoekt": "#3B82F6",
-  "Pilot": "#F59E0B",
-  "Opgeschaald": "#22C55E",
-  "Gestopt": "#EF4444",
-  "Niet opgepakt": "#9CA3AF"
+  "Onderzoekt": "#2F68C4",
+  "Pilot": "#9F6607",
+  "Opgeschaald": "#147638",
+  "Gestopt": "#D73D3D",
+  "Niet opgepakt": "#6D727A"
 };
 
 const INTERESSES = DOMAINS.slice();

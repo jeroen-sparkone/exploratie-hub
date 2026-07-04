@@ -314,7 +314,7 @@
       domainSegs += `<path d="${wheelArcPath(cx, cy, rInnerOuter, rInnerInner, start, end)}" fill="${color}" stroke="#fff" stroke-width="1.5"><title>${esc(d)}: ${n}</title></path>`;
       if (n) {
         const [nx, ny] = polarPoint(cx, cy, (rInnerOuter + rInnerInner) / 2, (start + end) / 2);
-        labels += `<text x="${nx.toFixed(1)}" y="${ny.toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">${n}</text>`;
+        labels += `<text x="${nx.toFixed(1)}" y="${ny.toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="${DOMAIN_TEXT_COLORS[d]}">${n}</text>`;
       }
       let cl = clusters.find(c => c.name === DOMAIN_CLUSTERS[d]);
       if (!cl) { cl = { name: DOMAIN_CLUSTERS[d], start, color }; clusters.push(cl); }
@@ -334,7 +334,7 @@
       <div class="domain-cluster">
         <div class="domain-cluster-title">${esc(cluster)}</div>
         <div class="domain-chips">${domains.map(d => `
-          <button type="button" class="domain-chip${activeDomain === d ? " active" : ""}" style="background:${DOMAIN_COLORS[d]}" data-domain="${esc(d)}">${esc(d)} · ${counts[d] || 0}</button>
+          <button type="button" class="domain-chip${activeDomain === d ? " active" : ""}" style="background:${DOMAIN_COLORS[d]};color:${DOMAIN_TEXT_COLORS[d]}" data-domain="${esc(d)}">${esc(d)} · ${counts[d] || 0}</button>
         `).join("")}</div>
       </div>`).join("")}</div>`;
   }
@@ -421,7 +421,7 @@
     const stats = techStats(t);
     return `
       <div class="card pcard" data-id="${esc(t.id)}" role="link" tabindex="0" aria-label="${esc(t.naam)}">
-        <div class="thumb" style="background:${DOMAIN_COLORS[t.domein]}"><span class="tag">${esc(t.domein)}</span></div>
+        <div class="thumb" style="background:${DOMAIN_COLORS[t.domein]}"><span class="tag" style="color:${DOMAIN_TEXT_COLORS[t.domein]}">${esc(t.domein)}</span></div>
         <div class="body">
           <h3>TRL ${t.trl} · ${esc(t.naam)}</h3>
           <div class="org">${stats.orgCount} organisatie${stats.orgCount === 1 ? "" : "s"} onderzoekt dit</div>
