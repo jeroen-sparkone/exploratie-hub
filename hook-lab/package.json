@@ -1,0 +1,9 @@
+{
+  "name": "hook-lab",
+  "private": true,
+  "description": "Test: hook-varianten met Motion Prompt-elementen. node_modules is een symlink naar remotion-vinovonk.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "for v in origineel mask-reveal count-up impact; do remotion render src/index.ts hook-$v out/hook-$v.mp4; done"
+  }
+}
