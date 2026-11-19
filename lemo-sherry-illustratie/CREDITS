@@ -10,10 +10,15 @@ Sherry-driehoek · VinoVonk-illustratiestijl, 9:16 · derde-partijmateriaal en b
 - FACTS.md (Consejo Regulador, Memoria 2025; Pliego DO Manzanilla-Sanlúcar; gids sherry-driehoek-albariza op vinovonk.com).
   Afstanden berekend uit de coördinaten van de stadscentra.
 
-## Stem
-- Microsoft Edge online text-to-speech via edge-tts (MIT), stem nl-NL-MaartenNeural, met fonetische spelling voor
-  Sanlúcar en El Puerto in de stem-invoer. Engelse versie: en-GB-RyanNeural, idem met fonetische spelling voor de
-  Spaanse namen. De muziekversies hebben geen stem. Toets de voorwaarden van Microsoft vóór commercieel gebruik.
+## Gepubliceerd
+- Alleen de muziekversies, zonder stem: sherry-driehoek-illustratie-muziek.mp4 (IG @vinovonk trial reel 24-11-2026,
+  YouTube Short Sparks by VinoVonk 25-11-2026) en sherry-triangle-illustration-en-music.mp4 (TikTok 25-11-2026).
+
+## Stem (niet gepubliceerd)
+- De stemversies zijn alleen proefversies en zijn nergens gebruikt. Ze komen uit edge-tts (MIT), dat de Read
+  Aloud-dienst van Microsoft Edge aanroept (nl-NL-MaartenNeural, en-GB-RyanNeural). Daarvoor bestaat geen commerciële
+  licentie (getoetst 19-11-2026). Wil je een stem publiceren, gebruik dan Azure AI Speech (betaald) of een eigen
+  opname, en meld dat de stem synthetisch is.
 
 ## Muziek
 - Samples CC0 (Versilian Studios: VS Chamber Orchestra CE en Versilian Community Sample Library). Ambience en foley
