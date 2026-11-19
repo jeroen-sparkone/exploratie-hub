@@ -1,0 +1,394 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Sherry-driehoek · 3D Map Explainer</title>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<style>
+@font-face{font-family:Barlow;src:url(fonts/BarlowCondensed-Regular.ttf);font-weight:400}
+@font-face{font-family:Barlow;src:url(fonts/BarlowCondensed-Medium.ttf);font-weight:500}
+@font-face{font-family:Barlow;src:url(fonts/BarlowCondensed-SemiBold.ttf);font-weight:600}
+@font-face{font-family:NotoSerif;src:url(fonts/NotoSerif-900.woff2) format('woff2');font-weight:900}
+html,body{margin:0;background:#05080c;overflow:hidden}
+canvas{position:absolute;left:0;top:0}
+</style></head>
+<body>
+<script type="module">
+// Sherry-driehoek, 9:16. Eén tijdlijn (shotlijst in TREATMENT.md), 96 bpm, één maat = 2,5 s.
+//   S1 0–4.2 albariza dichtbij · S2 4.2–12.8 klim, drie steden, driehoek · S3 12.8–18.2 pull-out west, poniente
+//   S4 18.2–31 Sanlúcar · S5 31–36.4 orbit oost, levante · S6 36.4–44 klim, hectares, eindkaart
+import * as THREE from 'three';
+import { makePost } from './post.js';
+import { clamp, lerp, seg, ss, eo, eio, track, mulberry } from '/core/lib.js';
+
+const Wd = innerWidth || 1080, Ht = innerHeight || 1920, Q = new URLSearchParams(location.search);
+const FULL = 45;
+const T0 = +(Q.get('t0') || 0), T1 = Q.has('t1') ? +Q.get('t1') : FULL;
+
+// ---------- data ----------
+const J = u => fetch(u).then(r => r.json()), B = u => fetch(u).then(r => r.arrayBuffer());
+const [meta, wmeta, hraw, wraw, CUES] = await Promise.all([J('assets/meta.json'), J('assets/wide_meta.json'), B('assets/height.bin'), B('assets/wide_height.bin'), J('voice/cues.json')]);
+const hbuf = new Float32Array(hraw), wbuf = new Float32Array(wraw);
+const EX = 4.0;                                     // land ×4 (zelfde waarde als tools/bake.py)
+const { GW, GH, km_px, width_km: WK, height_km: HK } = meta;
+const [MX0, MY0] = meta.merc;
+const D2R = Math.PI / 180;
+
+function merc(lon, lat) { const n = 2 ** meta.z * 256; return [(lon + 180) / 360 * n, (1 - Math.asinh(Math.tan(lat * D2R)) / Math.PI) / 2 * n]; }
+function xz(lon, lat) { const [mx, my] = merc(lon, lat); return [(mx - MX0) * km_px - WK / 2, (my - MY0) * km_px - HK / 2]; }
+const [WX0, WZ0] = xz(wmeta.bbox[0], wmeta.bbox[3]), [WX1, WZ1] = xz(wmeta.bbox[2], wmeta.bbox[1]);
+function bil(buf, w, h, gx, gz) {
+  const x0 = Math.max(0, Math.min(w - 2, Math.floor(gx))), z0 = Math.max(0, Math.min(h - 2, Math.floor(gz)));
+  const fx = clamp(gx - x0), fz = clamp(gz - z0);
+  const a = buf[z0 * w + x0], b = buf[z0 * w + x0 + 1], c = buf[(z0 + 1) * w + x0], d = buf[(z0 + 1) * w + x0 + 1];
+  return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
+}
+function hAt(X, Z) {
+  if (Math.abs(X) < WK / 2 && Math.abs(Z) < HK / 2) return bil(hbuf, GW, GH, (X + WK / 2) / WK * (GW - 1), (Z + HK / 2) / HK * (GH - 1));
+  return bil(wbuf, wmeta.GW, wmeta.GH, (X - WX0) / (WX1 - WX0) * (wmeta.GW - 1), (Z - WZ0) / (WZ1 - WZ0) * (wmeta.GH - 1));
+}
+const yOf = h => Math.max(h, 0) / 1000 * EX;
+function geo(lon, lat, lift = 0) { const [X, Z] = xz(lon, lat); return new THREE.Vector3(X, yOf(hAt(X, Z)) + lift, Z); }
+function hav(a, b) { const R = 6371, p1 = a[1] * D2R, p2 = b[1] * D2R, dp = p2 - p1, dl = (b[0] - a[0]) * D2R;
+  return 2 * R * Math.asin(Math.sqrt(Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2)); }
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(2); renderer.setSize(Wd, Ht);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const HAZE = new THREE.Color(0x65707a);
+scene.background = HAZE.clone();
+scene.fog = new THREE.Fog(HAZE, 300, 900);
+
+const tl = new THREE.TextureLoader();
+const load = u => new Promise((r, e) => tl.load(u, r, undefined, e));
+const [albedo, waterTex, shadowTex, walbedo, wwaterTex, wshadowTex] = await Promise.all(
+  ['assets/albedo.jpg', 'assets/water.png', 'assets/shadow.png', 'assets/wide_albedo.jpg', 'assets/wide_water.png', 'assets/wide_shadow.png'].map(load));
+for (const t of [albedo, walbedo]) { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16; }
+for (const t of [shadowTex, wshadowTex]) t.anisotropy = 8;
+
+function roughFrom(tex) {
+  const c = document.createElement('canvas'); c.width = tex.image.width; c.height = tex.image.height;
+  const g = c.getContext('2d'); g.drawImage(tex.image, 0, 0); const id = g.getImageData(0, 0, c.width, c.height);
+  for (let i = 0; i < id.data.length; i += 4) { const w = id.data[i] / 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = 245 * (1 - w) + 185 * w; }
+  g.putImageData(id, 0, 0); return new THREE.CanvasTexture(c);
+}
+const LIGHT_CHUNK = THREE.ShaderChunk.lights_fragment_begin.replaceAll('RE_Direct( directLight,', 'directLight.color *= mix( 1.0, texture2D( tShadow, vMapUv ).r, 0.88 );\n\t\tRE_Direct( directLight,');
+function terrainMat(map, water, shadow, clipRect, blendWide = false) {
+  const m = new THREE.MeshStandardMaterial({ map, roughnessMap: roughFrom(water), roughness: 1, metalness: 0 });
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, { tShadow: { value: shadow }, clipR: { value: clipRect || new THREE.Vector4(1, 1, -1, -1) },
+      tWide: { value: walbedo }, wBox: { value: new THREE.Vector4(WX0, WZ0, WX1, WZ1) }, dBox: { value: new THREE.Vector2(WK / 2, HK / 2) }, bw: { value: blendWide ? 1 : 0 } });
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      if (bw > .5) { vec2 uw = vec2((vWp.x - wBox.x) / (wBox.z - wBox.x), 1. - (vWp.z - wBox.y) / (wBox.w - wBox.y));
+        float ed = min(dBox.x - abs(vWp.x), dBox.y - abs(vWp.z)); float f = 1. - smoothstep(.0, 4.5, ed);
+        vec4 wc = texture2D(tWide, uw); diffuseColor.rgb = mix(diffuseColor.rgb, wc.rgb, f); }`);
+    sh.fragmentShader = 'uniform sampler2D tWide; uniform vec4 wBox; uniform vec2 dBox; uniform float bw;\n' + sh.fragmentShader;
+    sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform sampler2D tShadow; uniform vec4 clipR; varying vec3 vWp;\n' + sh.fragmentShader
+      .replace('void main() {', 'void main() {\n if (vWp.x > clipR.x && vWp.x < clipR.z && vWp.z > clipR.y && vWp.z < clipR.w) discard;')
+      .replace('#include <lights_fragment_begin>', LIGHT_CHUNK);
+  };
+  return m;
+}
+function terrainMesh(w, h, gw, gh, buf, mat) {
+  const g = new THREE.PlaneGeometry(w, h, gw - 1, gh - 1); g.rotateX(-Math.PI / 2);
+  const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, yOf(buf[i]));
+  g.computeVertexNormals(); return new THREE.Mesh(g, mat);
+}
+scene.add(terrainMesh(WK, HK, GW, GH, hbuf, terrainMat(albedo, waterTex, shadowTex, null, true)));
+{
+  const inset = 1.2, clip = new THREE.Vector4(-WK / 2 + inset, -HK / 2 + inset, WK / 2 - inset, HK / 2 - inset);
+  const wm = terrainMesh(WX1 - WX0, WZ1 - WZ0, wmeta.GW, wmeta.GH, wbuf, terrainMat(walbedo, wwaterTex, wshadowTex, clip));
+  wm.position.set((WX0 + WX1) / 2, -.03, (WZ0 + WZ1) / 2); scene.add(wm);
+}
+const sun = new THREE.DirectionalLight(0xffe2b8, 3.1);
+sun.position.set(-150, 62, -70); sun.target.position.set(0, 0, 0);
+scene.add(sun, sun.target, new THREE.HemisphereLight(0x9fb6c8, 0x4a3420, 0.55));
+
+// ---------- gloeiende linten (shader uit de stijl-demo, zonder doorsnede en kielzog) ----------
+const FOV = 40;
+const camera = new THREE.PerspectiveCamera(FOV, Wd / Ht, .2, 900);
+const PIXK = 2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)) / Ht;
+const RIB_V = `attribute float aSide; attribute vec3 aNorm; attribute float aAlong;
+  uniform float wW, pxW, pixK; varying float vSide, vAlong;
+  void main(){ vec4 wp = modelMatrix * vec4(position, 1.); float pw = length(cameraPosition - wp.xyz) * pixK;
+    float hw = max(wW * .5, pxW * .5 * pw); wp.xyz += aNorm * aSide * hw; vSide = aSide; vAlong = aAlong;
+    gl_Position = projectionMatrix * viewMatrix * wp; }`;
+const RIB_F = `varying float vSide, vAlong; uniform vec3 col; uniform float k, inten, revA, revB, soft, head, headAmt,
+  flowSp, flowLen, flowAmt, flowPh, base, L, endFade;
+  void main(){
+    float d = vSide; float g = exp(-d * d * k);
+    float vis = smoothstep(revA - soft, revA, vAlong) * (1. - smoothstep(revB, revB + soft, vAlong));
+    if (vis <= 0.) discard;
+    float e = smoothstep(0., endFade, vAlong) * smoothstep(L, L - endFade, vAlong);
+    float a = base;
+    if (flowAmt > 0.) { float f = fract((vAlong - flowPh) / flowSp); a += flowAmt * smoothstep(1. - flowLen / flowSp, 1., f) * smoothstep(1., .985, f); }
+    a += headAmt * exp(-pow((vAlong - head) / (2.5 * max(1., soft / 2.)), 2.));
+    gl_FragColor = vec4(col * g * a * inten * vis * e, 1.); }`;
+function ribbon(pts, o) {
+  const pos = [], side = [], nrm = [], al = [], idx = []; let L = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const t = new THREE.Vector3().subVectors(b, a); const n = new THREE.Vector3().crossVectors(t, new THREE.Vector3(0, 1, 0)).normalize();
+    if (i) L += pts[i].distanceTo(pts[i - 1]);
+    const p = pts[i];
+    for (const s of [1, -1]) { pos.push(p.x, p.y, p.z); side.push(s); nrm.push(n.x, n.y, n.z); al.push(L); }
+    if (i) { const q = 2 * i; idx.push(q - 2, q - 1, q, q - 1, q + 1, q); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aSide', new THREE.Float32BufferAttribute(side, 1));
+  g.setAttribute('aNorm', new THREE.Float32BufferAttribute(nrm, 3)); g.setAttribute('aAlong', new THREE.Float32BufferAttribute(al, 1)); g.setIndex(idx);
+  const U = { col: new THREE.Color(o.col ?? 0xffa63d), k: o.k ?? 3, inten: 0, wW: o.wW ?? 0, pxW: o.pxW ?? 2, pixK: PIXK, revA: 0, revB: 1e9, soft: o.soft ?? 2,
+    head: -1e6, headAmt: 0, flowSp: o.flowSp ?? 30, flowLen: o.flowLen ?? 6, flowAmt: o.flowAmt ?? 0, flowPh: 0, base: o.base ?? 1, L, endFade: o.endFade ?? .01 };
+  const uniforms = {}; for (const k in U) uniforms[k] = { value: U[k] };
+  const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms, vertexShader: RIB_V, fragmentShader: RIB_F, side: THREE.DoubleSide, transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending, toneMapped: false }));
+  m.renderOrder = o.order ?? 2; m.frustumCulled = false; scene.add(m);
+  m.L = L; m.u = uniforms; return m;
+}
+const smooth = (pts, n) => new THREE.CatmullRomCurve3(pts, false, 'centripetal').getSpacedPoints(n);
+const rv = (r, a) => { for (const k in a) r.u[k].value = a[k]; };
+const AMB = 0xffa63d, AMB2 = 0xffc36b, TEAL = 0x2fa3b0, TEAL2 = 0x8fd6de, MEAS = 0xf6eee0;
+
+// ---------- de drie steden en de driehoek (rechte lijnen tussen de stadscentra) ----------
+const CITY = {
+  JEREZ: { ll: [-6.137, 36.686], name: 'JEREZ', sub: 'DE LA FRONTERA', t: 9.25 },
+  SANLUCAR: { ll: [-6.352, 36.778], name: 'SANLÚCAR', sub: 'DE BARRAMEDA', t: 9.75 },
+  PUERTO: { ll: [-6.233, 36.594], name: 'EL PUERTO', sub: 'DE SANTA MARÍA', t: 10.55 } };
+const EDGES = [['JEREZ', 'SANLUCAR'], ['SANLUCAR', 'PUERTO'], ['PUERTO', 'JEREZ']].map(([a, b], i) => {
+  const A = CITY[a].ll, Bb = CITY[b].ll, pts = [];
+  for (let k = 0; k <= 120; k++) { const f = k / 120; pts.push(geo(lerp(A[0], Bb[0], f), lerp(A[1], Bb[1], f), .06)); }
+  const km = hav(A, Bb);
+  return { a, b, km, t: 11.0 + i * .3, mid: [(A[0] + Bb[0]) / 2, (A[1] + Bb[1]) / 2],
+    glow: ribbon(pts, { pxW: 9, k: 3, base: .2, col: MEAS, order: 3 }), core: ribbon(pts, { pxW: 2.2, k: 1.2, base: 1.1, col: MEAS, order: 3 }) };
+});
+
+// ---------- de winden (schematisch): poniente uit het westen, levante uit het oosten ----------
+const RND = mulberry(11);
+function windLine(lon0, lon1, lat, lift, wob) {
+  const pts = []; const ph = RND() * 6.28;
+  for (let k = 0; k <= 16; k++) { const f = k / 16, lo = lerp(lon0, lon1, f), la = lat + Math.sin(f * 3.1 + ph) * wob + (RND() - .5) * .004;
+    const [X, Z] = xz(lo, la); pts.push(new THREE.Vector3(X, Math.max(yOf(hAt(X, Z)), 0) + lift, Z)); }
+  return smooth(pts, 260);
+}
+const PONI = Array.from({ length: 15 }, (_, i) => {
+  const lat = 36.42 + i * .047 + (RND() - .5) * .02, lon0 = -7.45 + (RND() - .5) * .2, lon1 = -5.95 - RND() * .35;
+  const pts = windLine(lon0, lon1, lat, .55 + RND() * .35, .03);
+  return { d: RND() * .9, glow: ribbon(pts, { pxW: 9, k: 3, base: .16, col: AMB, endFade: 14 }), core: ribbon(pts, { pxW: 2.2, k: 1.2, base: .55, col: AMB2, flowAmt: 2.2, flowSp: 34, flowLen: 9, endFade: 14 }) };
+});
+const LEVA = Array.from({ length: 12 }, (_, i) => {
+  const lat = 36.48 + i * .045 + (RND() - .5) * .02, lon0 = -5.42 - RND() * .15, lon1 = -6.38 + RND() * .25;
+  const pts = windLine(lon0, lon1, lat, .8 + RND() * .4, .025);
+  return { d: RND() * .9, glow: ribbon(pts, { pxW: 9, k: 3, base: .16, col: TEAL, endFade: 26 }), core: ribbon(pts, { pxW: 2.2, k: 1.2, base: .6, col: TEAL2, flowAmt: 2.0, flowSp: 30, flowLen: 8, endFade: 26 }) };
+});
+
+// ---------- camera: één doorlopende beweging ----------
+// keys: t, [log afstand km, pitch°, yaw°, doel lon, doel lat, doelhoogte km]; yaw 0 = camera ten zuiden van het doel, kijkt naar het noorden
+const ALB = [-6.165, 36.742];                       // heuvels ten noorden van Jerez, op albariza
+const MID = [-6.24, 36.69];
+const CAM = track([
+  [0.0, [Math.log(3.4), 21, -14, ALB[0] - .012, ALB[1], .2]],
+  [4.2, [Math.log(5.0), 25, -6, ALB[0] + .004, ALB[1] + .004, .2]],
+  [8.0, [Math.log(26), 38, -2, -6.20, 36.71, 0]],
+  [10.8, [Math.log(78), 56, 0, MID[0], MID[1] + .01, 0]],
+  [12.8, [Math.log(84), 58, 2, MID[0], MID[1] + .01, 0]],
+  [15.6, [Math.log(118), 57, 18, -6.58, 36.66, 0]],
+  [18.2, [Math.log(124), 57, 20, -6.57, 36.67, 0]],
+  [21.0, [Math.log(30), 33, -18, -6.33, 36.765, 0]],
+  [27.6, [Math.log(24), 30, -26, -6.34, 36.772, 0]],
+  [31.0, [Math.log(22), 29, -30, -6.34, 36.775, 0]],
+  [33.4, [Math.log(92), 50, 118, -6.07, 36.70, 0]],
+  [36.4, [Math.log(98), 52, 132, -6.10, 36.70, 0]],
+  [39.2, [Math.log(98), 70, 176, MID[0], MID[1] + .005, 0]],
+  [45.0, [Math.log(106), 71, 181, MID[0], MID[1] + .005, 0]]]);
+function mapCam(t) {
+  const [ld, pd, yd, lo, la, h] = CAM(clamp(t, 0, FULL)); const [X, Z] = xz(lo, la), d = Math.exp(ld), p = pd * D2R, y = yd * D2R;
+  return { d, cam: new THREE.Vector3(X + Math.sin(y) * Math.cos(p) * d, h + Math.sin(p) * d, Z + Math.cos(y) * Math.cos(p) * d), tgt: new THREE.Vector3(X, h, Z) };
+}
+function setCamera(t) {
+  const { d, cam, tgt } = mapCam(t);
+  camera.position.copy(cam);
+  camera.near = Math.max(.05, d * .03); camera.far = d * 6 + 400; camera.lookAt(tgt); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+  scene.fog.near = d * .95; scene.fog.far = d * 2.3 + 30;
+  return d;
+}
+
+// ---------- post ----------
+const post = makePost(renderer, scene, camera, Wd, Ht, { ssaa: 2, ao: false });
+post.dof.maxCoc = 7; post.bloom.strength = .55; post.bloom.radius = .55; post.bloom.threshold = .95;
+const VU = post.vig.uniforms; VU.amt.value = .42; VU.warm.value = .25; VU.sat.value = .92; VU.contrast.value = .12;
+
+// ---------- overlay ----------
+const ov = document.createElement('canvas'); ov.width = Wd * 2; ov.height = Ht * 2; ov.style.width = Wd + 'px'; ov.style.height = Ht + 'px'; document.body.appendChild(ov);
+const g = ov.getContext('2d');
+await Promise.all(['400 20px Barlow', '500 20px Barlow', '600 20px Barlow', '900 20px NotoSerif'].map(f => document.fonts.load(f, 'SANLÚCAR')));
+const scr = v => { const p = v.clone().project(camera); return [(p.x + 1) / 2 * Wd, (1 - p.y) / 2 * Ht, p.z]; };
+const C = { land: '#2b2119', sea: '#bcdbe6', light: '#f6eee0', amber: '#ffc36b', amberSoft: 'rgba(255,214,150,.95)', teal: '#9fe3ea', dim: 'rgba(240,232,216,.7)' };
+let TX = [];
+function txt(s, x, y, o) {
+  g.save(); g.font = `${o.w || 500} ${o.size}px ${o.f || 'Barlow'}`; g.letterSpacing = (o.sp || 0) + 'px';
+  g.textAlign = o.align || 'center'; g.textBaseline = o.base || 'middle'; g.globalAlpha = clamp(o.a ?? 1); g.fillStyle = o.col || C.light;
+  g.fillText(s, x, y); const w = g.measureText(s).width;
+  const x0 = o.align === 'left' ? x : o.align === 'right' ? x - w : x - w / 2;
+  if ((o.a ?? 1) > .5 && !o.nobox) TX.push({ id: o.id || s, text: s, x0, y0: y - o.size * .6, x1: x0 + w, y1: y + o.size * .6 });
+  g.restore(); return w;
+}
+const tw = (s, size, w = 500, sp = 0, f = 'Barlow') => { g.save(); g.font = `${w} ${size}px ${f}`; g.letterSpacing = sp + 'px'; const r = g.measureText(s).width; g.restore(); return r; };
+function line(pts, col, w = 1.4, a = 1) { g.save(); g.globalAlpha = a; g.strokeStyle = col; g.lineWidth = w; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); g.restore(); }
+function dot(x, y, r, col, a = 1) { g.save(); g.globalAlpha = a; g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.restore(); }
+function rings(x, y, t0, t, a, col = C.amber, R = 46) { const r = seg(t, t0, t0 + 1.6); for (const k of [0, .33, .66]) { const q = (r * 1.4 + k) % 1; if (r <= 0) break;
+  g.save(); g.globalAlpha = a * (1 - q) * .85; g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 7 + R * q, 0, 7); g.stroke(); g.restore(); } }
+
+const TOP_SAFE = 230, SUB_Y = Ht - 470, BOTTOM_SAFE = Ht - SUB_Y + 120;   // IG-interface boven en onder; de ondertitelplank
+const STY = {
+  sea: { size: 34, w: 500, sp: 9, col: C.sea, a: .92 }, seaS: { size: 26, w: 500, sp: 6, col: C.sea, a: .9 },
+  land: { size: 34, w: 600, sp: 9, col: C.land, a: .8 }, river: { size: 24, w: 500, sp: 6, col: C.sea, a: .9 } };
+// [lon, lat, tekst, stijl, van, tot]
+const LABELS = [
+  [-6.75, 36.62, 'ATLANTISCHE OCEAAN', 'sea', 13.6, 18.0], [-6.30, 36.545, 'BAAI VAN CÁDIZ', 'seaS', 7.8, 12.7],
+  [-6.40, 36.84, 'GUADALQUIVIR', 'river', 21.0, 27.6], [-5.75, 36.86, 'ANDALUCÍA', 'land', 32.2, 36.4]];
+function mapLabels(t) {
+  for (const [lo, la, s, kind, a0, a1] of LABELS) {
+    let a = ss(seg(t, a0, a0 + .6)) * (1 - ss(seg(t, a1 - .5, a1))); if (a <= .01) continue;
+    const st = STY[kind], [x, y, z] = scr(geo(lo, la, .3)); if (z > 1) continue;
+    const w = tw(s, st.size, st.w, st.sp), m = Math.min(x - w / 2 - 40, Wd - 40 - x - w / 2, y - TOP_SAFE, SUB_Y - 80 - y);
+    a *= ss(seg(m, 0, 60)); if (a <= .01) continue;
+    txt(s, x, y, { ...st, a: a * st.a, id: 'L' + s });
+  }
+}
+
+// S1: het woord op de grond
+function albarizaLabel(t) {
+  const a = ss(seg(t, 1.0, 1.6)) * (1 - ss(seg(t, 5.6, 6.4))); if (a <= 0) return;
+  const [x, y] = scr(geo(...ALB, .02));
+  const lx = Math.min(Math.max(x, 260), Wd - 260), ly = clamp(y - 210, TOP_SAFE + 120, SUB_Y - 260);
+  dot(x, y, 5, C.light, a); line([[x, y - 6], [lx, ly + 70]], 'rgba(246,238,224,.8)', 1.4, a * ss(seg(t, 1.2, 1.8)));
+  txt('ALBARIZA', lx, ly, { size: 96, w: 600, sp: 14, col: C.light, a, id: 'alb' });
+  txt('WITTE KALKMERGEL', lx, ly + 62, { size: 28, w: 500, sp: 7, col: C.dim, a: a * ss(seg(t, 1.6, 2.2)), id: 'alb2' });
+}
+
+// S2: drie pins en de afstanden
+function cities(t) {
+  const out = 1 - ss(seg(t, 30.6, 31.6)) * .55;
+  for (const k in CITY) {
+    const c = CITY[k], a = ss(seg(t, c.t, c.t + .4)) * out; if (a <= 0) continue;
+    const [x, y, z] = scr(geo(...c.ll, .05)); if (z > 1) continue;
+    rings(x, y, c.t, t, a); dot(x, y, 6, C.amber, a);
+    const big = t < 31 ? 1 : 0, left = k === 'SANLUCAR';
+    const nw = tw(c.name, 38, 600, 5); let lx = x + (left ? -18 : 18); const al = left ? 'right' : 'left';
+    lx = left ? Math.max(lx, 40 + nw) : Math.min(lx, Wd - 40 - nw);
+    txt(c.name, lx, y - 22, { size: k === 'SANLUCAR' && t > 18.2 && t < 31 ? 50 : 38, w: 600, sp: 5, align: al, col: C.light, a: a * (big ? 1 : .8), id: 'c' + k });
+    txt(c.sub, lx, y + 12, { size: 20, w: 500, sp: 4, align: al, col: C.dim, a: a * ss(seg(t, c.t + .2, c.t + .7)) * (t < 18.2 ? 1 : 0), id: 'cs' + k });
+  }
+  for (const E of EDGES) {
+    const a = ss(seg(t, E.t + .3, E.t + .8)) * (1 - ss(seg(t, 14.4, 15.0))); if (a <= 0) continue;
+    const [x, y] = scr(geo(...E.mid, .05));
+    txt(Math.round(E.km) + ' KM', x, y + (E.a === 'PUERTO' ? 0 : 0), { size: 30, w: 600, sp: 3, col: C.light, a, id: 'km' + E.a });
+  }
+}
+
+// S3/S5: de namen van de winden, op zee en boven het land
+function winds(t) {
+  const p = ss(seg(t, 14.2, 14.8)) * (1 - ss(seg(t, 19.0, 19.8)));
+  if (p > 0) { const [x, y] = scr(geo(-6.95, 36.74, 1)); const X = clamp(x, 120, Wd - 360), Y = clamp(y, TOP_SAFE + 80, SUB_Y - 200);
+    txt('PONIENTE', X, Y, { size: 64, w: 600, sp: 10, align: 'left', col: '#ffd08a', a: p, id: 'poni' });
+    txt('WEST · KOEL EN VOCHTIG', X + 2, Y + 48, { size: 24, w: 500, sp: 5, align: 'left', col: C.amberSoft, a: p * ss(seg(t, 14.6, 15.2)), id: 'poni2' }); }
+  const l = ss(seg(t, 32.4, 33.0)) * (1 - ss(seg(t, 36.6, 37.2)));
+  if (l > 0) { const [x, y] = scr(geo(-5.62, 36.66, 1)); const X = clamp(x, 120, Wd - 360), Y = clamp(y, TOP_SAFE + 80, SUB_Y - 200);
+    txt('LEVANTE', X, Y, { size: 64, w: 600, sp: 10, align: 'left', col: C.teal, a: l, id: 'leva' });
+    txt('OOST · HEET EN DROOG', X + 2, Y + 48, { size: 24, w: 500, sp: 5, align: 'left', col: '#cfeff2', a: l * ss(seg(t, 32.8, 33.4)), id: 'leva2' }); }
+}
+
+// S4: Sanlúcar en de regel
+function sanlucar(t) {
+  const c = CITY.SANLUCAR, [x, y] = scr(geo(...c.ll, .05));
+  const a = ss(seg(t, 23.2, 23.6)) * (1 - ss(seg(t, 30.6, 31.2))); if (a > 0) { rings(x, y, 23.2, t, a, C.amber, 150); rings(x, y, 24.0, t, a * .7, C.amber, 150); }
+  const m = ss(seg(t, 28.5, 29.1)) * (1 - ss(seg(t, 32.1, 32.6))); if (m <= 0) return;
+  const X = 96, Y = TOP_SAFE + 150;
+  g.save(); g.globalAlpha = m; g.fillStyle = C.amber; g.fillRect(X - 26, Y - 46, 4, 150); g.restore();
+  txt('MANZANILLA', X, Y, { size: 72, w: 600, sp: 8, align: 'left', col: C.light, a: m, id: 'manz' });
+  txt('RIJPT ALLEEN IN SANLÚCAR', X + 2, Y + 56, { size: 28, w: 600, sp: 5, align: 'left', col: C.amberSoft, a: m, id: 'manz2' });
+  txt('REGEL VAN DE CONSEJO REGULADOR', X + 2, Y + 90, { size: 20, w: 500, sp: 4, align: 'left', col: C.dim, a: m, id: 'manz3' });
+}
+
+// S6: het oppervlak, dan de eindkaart
+function hectares(t) {
+  const a = ss(seg(t, 36.6, 37.2)) * (1 - ss(seg(t, 40.4, 40.9))); if (a <= 0) return;
+  const X = Wd / 2, Y = TOP_SAFE + 170;
+  txt('6.867', X, Y, { size: 150, w: 600, sp: 2, col: '#ffd08a', a, id: 'ha' });
+  txt('HECTARE WIJNGAARD IN DE DO', X, Y + 100, { size: 30, w: 600, sp: 5, col: C.light, a, id: 'ha2' });
+  txt('ALLE BODEMS · CONSEJO REGULADOR 2025', X, Y + 140, { size: 20, w: 500, sp: 3.5, col: C.dim, a, id: 'ha3' });
+}
+function endCard(t) {
+  const a = ss(seg(t, 40.4, 41.0)); if (a <= 0) return;
+  const e = eo(seg(t, 40.4, 41.2));
+  g.save(); g.globalAlpha = a * .55; g.fillStyle = '#05080c'; g.fillRect(0, 0, Wd, Ht); g.restore();
+  const X = 90, Y = Ht * .36, BW = (Wd - 180) * e;
+  g.save(); g.globalAlpha = a; g.fillStyle = '#8b0018'; g.fillRect(X, Y, BW, 330); g.restore();
+  if (e > .6) {
+    const k = ss(seg(t, 40.9, 41.4));
+    txt('SHERRY-', X + 50, Y + 92, { size: 84, w: 900, f: 'NotoSerif', align: 'left', col: '#fff8f0', a: a * k, id: 'e1' });
+    txt('DRIEHOEK', X + 50, Y + 182, { size: 84, w: 900, f: 'NotoSerif', align: 'left', col: '#fff8f0', a: a * k, id: 'e2' });
+    txt('LEES DE GIDS OP VINOVONK.COM', X + 52, Y + 270, { size: 30, w: 600, sp: 4, align: 'left', col: '#fff8f0', a: a * ss(seg(t, 41.2, 41.7)), id: 'e3' });
+  }
+  txt('@VINOVONK', Wd / 2, Y + 420, { size: 30, w: 600, sp: 6, col: C.light, a: a * ss(seg(t, 41.5, 42.0)), id: 'e4' });
+}
+
+// ondertitels: één NL-regel (zo nodig twee), links als een kaartlegenda
+function wrap(s, size, max) { const words = s.split(' '); const out = ['']; for (const w of words) { const tryS = out[out.length - 1] ? out[out.length - 1] + ' ' + w : w;
+  if (tw(tryS, size, 500, 1) > max && out[out.length - 1]) out.push(w); else out[out.length - 1] = tryS; } return out; }
+function subtitles(t) {
+  const c = CUES.find(c => t >= c.t0 - .12 && t < c.t1 + .12);
+  g.save(); const gr = g.createLinearGradient(0, SUB_Y - 160, 0, Ht); gr.addColorStop(0, 'rgba(6,10,15,0)'); gr.addColorStop(.5, 'rgba(6,10,15,.45)'); gr.addColorStop(1, 'rgba(6,10,15,.6)');
+  g.fillStyle = gr; g.fillRect(0, SUB_Y - 160, Wd, Ht - SUB_Y + 160); g.restore();
+  if (!c || t > 40.3) return;
+  const a = ss(seg(t, c.t0 - .12, c.t0 + .08)) * (1 - ss(seg(t, c.t1 - .08, c.t1 + .12)));
+  const X = 96, L = wrap(c.text, 44, Wd - 96 - 150), Y = SUB_Y - (L.length - 1) * 54;
+  g.save(); g.globalAlpha = a; g.fillStyle = C.amber; g.fillRect(X - 24, Y - 28, 4, 56 + (L.length - 1) * 54); g.restore();
+  L.forEach((s, i) => txt(s, X, Y + i * 54, { size: 44, w: 500, sp: 1, align: 'left', col: C.light, a, id: 'sub' + i, nobox: true }));
+}
+function credits(t) {
+  const a = ss(seg(t, .6, 1.4)) * (1 - ss(seg(t, 40.3, 40.7)));
+  const o = { size: 15, w: 500, sp: 1.6, align: 'right', col: 'rgba(240,232,216,.6)', a, nobox: true };
+  txt('HOOGTE AWS TERRAIN TILES · BEELD SENTINEL-2 CLOUDLESS 2016 BY EOX (CC BY 4.0)', Wd - 40, TOP_SAFE - 40, { ...o, id: 'cr1' });
+  txt('HOOGTE ×4 · WINDLIJNEN SCHEMATISCH', Wd - 40, TOP_SAFE - 16, { ...o, id: 'cr2' });
+}
+
+// ---------- het beeld op filmtijd t ----------
+function frame(t) {
+  TX = [];
+  const dist = setCamera(t);
+  g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, Wd, Ht);
+  // driehoek: ontbrandt met een heldere kop, blijft zacht staan
+  for (const E of EDGES) { const k = eo(seg(t, E.t, E.t + 1.0)), fade = 1 - ss(seg(t, 17.6, 18.6)) * .6;
+    for (const r of [E.glow, E.core]) rv(r, { revB: k * r.L, head: k * r.L, headAmt: r === E.core ? 1.4 * (1 - ss(seg(k, .8, 1))) : 0, inten: (t >= E.t ? 1 : 0) * fade, soft: 1.2 }); }
+  // poniente: 13.6 → 31, zacht tot het slot; levante: 31.8 → einde
+  for (const W of PONI) { const k = eio(seg(t, 13.6 + W.d, 16.4 + W.d)), on = (1 - ss(seg(t, 31.2, 32.4)) * .75) * (1 - ss(seg(t, 40.4, 41.1)) * .7);
+    const low = 1 + .9 * (1 - ss(seg(dist, 30, 60)));
+    for (const r of [W.glow, W.core]) rv(r, { revB: k * r.L, inten: (t >= 13.6 ? 1 : 0) * on * low, flowPh: t * 22, soft: 6, pxW: r === W.core ? 2.2 * low : 9 * low }); }
+  for (const W of LEVA) { const k = eio(seg(t, 31.8 + W.d, 34.4 + W.d)), on = 1 - ss(seg(t, 40.4, 41.1)) * .7;
+    for (const r of [W.glow, W.core]) rv(r, { revB: k * r.L, inten: (t >= 31.8 ? 1 : 0) * on, flowPh: t * 20, soft: 6 }); }
+  post.dof.focus = dist; post.dof.aper = dist * (t < 6 ? 5 : 4.5);
+  post.bloom.strength = .55;
+  VU.fade.value = ss(seg(t, 0, .5));
+  post.composer.render();
+  mapLabels(t); albarizaLabel(t); cities(t); winds(t); sanlucar(t); hectares(t);
+  if (!Q.has('nosubs')) subtitles(t);
+  credits(t); endCard(t);
+}
+
+window.DUR = T1 - T0;
+window.render = t => frame(t + T0);
+window.TEXTS = t => { window.render(t); return TX.map(o => ({ ...o })); };
+const EVF = [
+  { t: 0, type: 'air' }, { t: 1.0, type: 'word' }, { t: 4.2, type: 'rise' },
+  ...Object.values(CITY).map((c, i) => ({ t: c.t, type: 'pin', i })), ...EDGES.map((E, i) => ({ t: E.t, type: 'ignite', i })),
+  { t: 12.8, type: 'whoosh' }, { t: 13.6, type: 'poniente' }, { t: 18.2, type: 'dive' }, { t: 23.2, type: 'ring' },
+  { t: 27.7, type: 'silence' }, { t: 28.5, type: 'rule' }, { t: 31.0, type: 'orbit' }, { t: 31.8, type: 'levante' },
+  { t: 36.4, type: 'rise' }, { t: 36.6, type: 'stat' }, { t: 40.4, type: 'card' }];
+window.EV = EVF.map(e => ({ ...e, t: e.t - T0 })).filter(e => e.t >= 0 && e.t <= T1 - T0);
+window.render(0);
+window.READY = true;
+</script>
+</body></html>

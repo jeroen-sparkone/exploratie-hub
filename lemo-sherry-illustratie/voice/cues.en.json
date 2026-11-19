@@ -1,0 +1,66 @@
+[
+ {
+  "id": "v1",
+  "t0": 0.1,
+  "t1": 3.72,
+  "vo_end": 3.281,
+  "text": "Manzanilla from Jerez? No such thing.",
+  "nosub": true
+ },
+ {
+  "id": "v2",
+  "t0": 3.8,
+  "t1": 8.88,
+  "vo_end": 8.098,
+  "text": "It starts with albariza: chalk soil that holds water, even in summer."
+ },
+ {
+  "id": "v3",
+  "t0": 8.96,
+  "t1": 13.16,
+  "vo_end": 12.264,
+  "text": "It lies between Jerez, Sanlúcar and El Puerto."
+ },
+ {
+  "id": "v4",
+  "t0": 13.24,
+  "t1": 17.99,
+  "vo_end": 16.994,
+  "text": "From the west blows the poniente, cool and damp, off the ocean."
+ },
+ {
+  "id": "v5",
+  "t0": 18.07,
+  "t1": 22.84,
+  "vo_end": 21.511,
+  "text": "Damp air feeds the flor: the yeast on fino and manzanilla."
+ },
+ {
+  "id": "v6",
+  "t0": 22.92,
+  "t1": 28.37,
+  "vo_end": 26.847,
+  "text": "In Sanlúcar, at the river mouth, that layer stays thick all year."
+ },
+ {
+  "id": "v7",
+  "t0": 28.45,
+  "t1": 31.66,
+  "vo_end": 30.39,
+  "text": "Manzanilla ages only in Sanlúcar."
+ },
+ {
+  "id": "v8",
+  "t0": 31.74,
+  "t1": 36.62,
+  "vo_end": 34.658,
+  "text": "From the east comes the levante: hot and dry."
+ },
+ {
+  "id": "v9",
+  "t0": 36.7,
+  "t1": 39.84,
+  "vo_end": 38.84,
+  "text": "Two winds, one white soil."
+ }
+]

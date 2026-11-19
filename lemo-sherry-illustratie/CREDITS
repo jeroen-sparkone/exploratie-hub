@@ -1,0 +1,28 @@
+Sherry-driehoek · VinoVonk-illustratiestijl, 9:16 · derde-partijmateriaal en bronnen
+
+## Kaart
+- De kustlijn is afgeleid (tools in ../lemo-stijlkiezer/tools/coast.py) uit het watermasker van de map-explainer-proef:
+  Sentinel-2 cloudless 2016 (EOX IT Services GmbH, contains modified Copernicus Sentinel data 2016 & 2017), CC BY 4.0,
+  en AWS Terrain Tiles (o.a. SRTM, publiek domein). Getekend en gestileerd; windlijnen, rook, hittegolven en de
+  ligging van de albariza zijn schematisch.
+
+## Feiten
+- FACTS.md (Consejo Regulador, Memoria 2025; Pliego DO Manzanilla-Sanlúcar; gids sherry-driehoek-albariza op vinovonk.com).
+  Afstanden berekend uit de coördinaten van de stadscentra.
+
+## Stem
+- Microsoft Edge online text-to-speech via edge-tts (MIT), stem nl-NL-MaartenNeural, met fonetische spelling voor
+  Sanlúcar en El Puerto in de stem-invoer. Engelse versie: en-GB-RyanNeural, idem met fonetische spelling voor de
+  Spaanse namen. De muziekversies hebben geen stem. Toets de voorwaarden van Microsoft vóór commercieel gebruik.
+
+## Muziek
+- Samples CC0 (Versilian Studios: VS Chamber Orchestra CE en Versilian Community Sample Library). Ambience en foley
+  procedureel. Partituur: mix.py.
+
+## Fonts (SIL Open Font License 1.1)
+- Noto Serif 900, Space Grotesk 500/700 (VinoVonk-huisstijl), via de Google Fonts CSS API.
+
+## Code en stijl
+- Eigen tekencode (film.js); rendering met de tools van Lemo-Opuscar van Lemomo (LemoLab), MIT License.
+- Beeldtaal afgeleid van de eigen VinoVonk-hero-illustraties en carousel-typografie. Geen foto's, geen 3D-modellen,
+  geen AI-gegenereerde beelden in de film.

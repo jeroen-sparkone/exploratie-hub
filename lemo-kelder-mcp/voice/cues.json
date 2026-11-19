@@ -1,0 +1,65 @@
+[
+ {
+  "id": "v1",
+  "t0": 0.5,
+  "t1": 5.52,
+  "vo_end": 4.336,
+  "text": "Mijn kelderlijst staat op mijn laptop, en die wil ik nergens uploaden."
+ },
+ {
+  "id": "v2",
+  "t0": 5.6,
+  "t1": 11.12,
+  "vo_end": 9.576,
+  "text": "Het taalmodel draait in een datacenter, dus die kan er niet zomaar bij."
+ },
+ {
+  "id": "v3",
+  "t0": 11.2,
+  "t1": 16.72,
+  "vo_end": 15.648,
+  "text": "Daartussen staat een MCP-server van honderd regels, op mijn eigen machine."
+ },
+ {
+  "id": "v4",
+  "t0": 16.8,
+  "t1": 22.32,
+  "vo_end": 21.236,
+  "text": "Drie tools, alleen lezen: alles geven, zoeken en tellen per stijl."
+ },
+ {
+  "id": "v5",
+  "t0": 22.4,
+  "t1": 28.32,
+  "vo_end": 25.785,
+  "text": "In de toolbeschrijving staat dat het model eerst moet kijken."
+ },
+ {
+  "id": "v6",
+  "t0": 28.4,
+  "t1": 33.92,
+  "vo_end": 31.313,
+  "text": "De server leest het bestand bij elke vraag opnieuw."
+ },
+ {
+  "id": "v7",
+  "t0": 34,
+  "t1": 39.12,
+  "vo_end": 38.187,
+  "text": "Vindt hij niets, dan zegt hij dat ook, zodat het model niets bij verzint."
+ },
+ {
+  "id": "v8",
+  "t0": 39.2,
+  "t1": 41.72,
+  "vo_end": 40.74,
+  "text": "Het bestand blijft thuis."
+ },
+ {
+  "id": "v9",
+  "t0": 41.8,
+  "t1": 45.633,
+  "vo_end": 44.633,
+  "text": "Wat de tool teruggeeft, gaat wel naar de cloud."
+ }
+]

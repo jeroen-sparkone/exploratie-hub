@@ -2,3 +2,8 @@
 .worktrees/
 .claude/launch.json
 cutroom-test/
+
+# Lemo-Opuscar-proeven: renders, tussenbestanden en gedownloade tegels niet in git
+lemo-*/out/
+lemo-*/raw/
+lemo-*/*.mp4

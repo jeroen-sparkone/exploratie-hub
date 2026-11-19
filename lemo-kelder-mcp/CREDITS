@@ -1,0 +1,29 @@
+Kelder als MCP-server · Isometric Infographic, 9:16 · derde-partijmateriaal en bronnen
+
+## Feiten
+- Alles uit het eigen artikel "Zo gebruik ik AI: mijn kelder is een MCP-server geworden" op sparkone.nl (23-09-2026);
+  per bewering gekoppeld in FACTS.md. Het aantal flessen in beeld is illustratief.
+
+## Stem
+- Microsoft Edge online text-to-speech via edge-tts (MIT), stem nl-NL-MaartenNeural. Gebruik van de stem valt onder de
+  voorwaarden van Microsoft; toets die vóór commercieel gebruik. Spraakcheck: faster-whisper small (MIT).
+- In de stem-invoer staat "klaud" voor "cloud" (fonetisch); de ondertitels zijn correct gespeld.
+
+## Muzieksamples (CC0; vermelding niet verplicht, met dank)
+- Versilian Community Sample Library (Versilian Studios): marimba, woodblock, shaker, glockenspiel, gestreken vibrafoon.
+- VS Chamber Orchestra: Community Edition (Versilian Studios): contrabas pizzicato, claves.
+- FreePats (freepats.zenvoid.org): kalimba, CC0 1.0.
+- Ambience, foley en de elektronische puls zijn procedureel (core/audio/sfx.py en mix.py).
+
+## Fonts (SIL Open Font License 1.1, via de Google Fonts CSS API, door tools/fonts.py opgehaald)
+- Hanken Grotesk 500/700, JetBrains Mono 500, Instrument Serif 400 (de SparkOne-huisstijl).
+
+## Code
+- engine.js komt uit de Lemo-Opuscar-stijl Isometric Infographic van Lemomo (LemoLab), MIT License
+  (~/lemo-opuscar/LICENSES/MIT.txt), aangepast: font Hanken en een tekstrapport voor de readcheck.
+  De stijlprompt (STYLE.md) valt onder CC BY-NC 4.0 met de aanvullende toestemming in ~/lemo-opuscar/LICENSE;
+  de film zelf is van de maker.
+
+## Beeld
+- Alles in code getekend: geen foto's, geen 3D-modellen, geen AI-gegenereerde beelden. "Claude" staat alleen als
+  label in beeld; geen logo of interface van Anthropic.

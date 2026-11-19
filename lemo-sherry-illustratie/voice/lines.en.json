@@ -1,0 +1,64 @@
+[
+ {
+  "id": "v1",
+  "text": "Manzanilla from Jerez? No such thing.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "-2%",
+  "say": "Manzanilla from Hereth? No such thing."
+ },
+ {
+  "id": "v2",
+  "text": "It starts with albariza: chalk soil that holds water, even in summer.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "-2%",
+  "say": "It starts with alba-reetha: chalk soil that holds water, even in summer."
+ },
+ {
+  "id": "v3",
+  "text": "It lies between Jerez, Sanlúcar and El Puerto.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "-2%",
+  "say": "It lies between Hereth, San Lookar and El Pwairto."
+ },
+ {
+  "id": "v4",
+  "text": "From the west blows the poniente, cool and damp, off the ocean.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "-2%",
+  "say": "From the west blows the ponn-yentay, cool and damp, off the ocean."
+ },
+ {
+  "id": "v5",
+  "text": "Damp air feeds the flor: the yeast on fino and manzanilla.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "+5%",
+  "say": "Damp air feeds the flor: the yeast on fino and manzanilla."
+ },
+ {
+  "id": "v6",
+  "text": "In Sanlúcar, at the river mouth, that layer stays thick all year.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "-2%",
+  "say": "In San Lookar, at the river mouth, that layer stays thick all year."
+ },
+ {
+  "id": "v7",
+  "text": "Manzanilla ages only in Sanlúcar.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "+8%",
+  "say": "Manzanilla ages only in San Lookar."
+ },
+ {
+  "id": "v8",
+  "text": "From the east comes the levante: hot and dry.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "-2%",
+  "say": "From the east comes the lev-antay: hot and dry."
+ },
+ {
+  "id": "v9",
+  "text": "Two winds, one white soil.",
+  "voice": "en-GB-RyanNeural",
+  "rate": "-2%"
+ }
+]

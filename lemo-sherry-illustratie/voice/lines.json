@@ -1,0 +1,60 @@
+[
+ {
+  "id": "v1",
+  "text": "Manzanilla uit Jerez? Die bestaat niet.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "+8%"
+ },
+ {
+  "id": "v2",
+  "text": "Het begint bij albariza: kalkgrond die water vasthoudt, ook in de zomer.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v3",
+  "text": "Die grond ligt tussen Jerez, Sanlúcar en El Puerto.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-4%",
+  "say": "Die grond ligt tussen Jerez, San Loekar en El Pwérto."
+ },
+ {
+  "id": "v4",
+  "text": "Uit het westen waait de poniente, koel en vochtig, van de oceaan.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-4%",
+  "say": "Uit het westen waait de ponjénte, koel en vochtig, van de oceaan."
+ },
+ {
+  "id": "v5",
+  "text": "Die vochtige lucht helpt de flor, de gistlaag op fino en manzanilla.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-4%"
+ },
+ {
+  "id": "v6",
+  "text": "In Sanlúcar, aan de riviermonding, blijft die laag het hele jaar dik.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-4%",
+  "say": "In San Loekar, aan de riviermonding, blijft die laag het hele jaar dik."
+ },
+ {
+  "id": "v7",
+  "text": "Alleen in Sanlúcar mag manzanilla rijpen.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-4%",
+  "say": "Alleen in San Loekar mag manzanilla rijpen."
+ },
+ {
+  "id": "v8",
+  "text": "Uit het oosten komt de levante: heet en droog.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-4%"
+ },
+ {
+  "id": "v9",
+  "text": "Twee winden, één witte bodem.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-4%"
+ }
+]

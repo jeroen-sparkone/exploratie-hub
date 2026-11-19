@@ -1,0 +1,57 @@
+[
+ {
+  "id": "v1",
+  "text": "Mijn kelderlijst staat op mijn laptop, en die wil ik nergens uploaden.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v2",
+  "text": "Het taalmodel draait in een datacenter, dus die kan er niet zomaar bij.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v3",
+  "text": "Daartussen staat een MCP-server van honderd regels, op mijn eigen machine.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v4",
+  "text": "Drie tools, alleen lezen: alles geven, zoeken en tellen per stijl.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v5",
+  "text": "In de toolbeschrijving staat dat het model eerst moet kijken.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v6",
+  "text": "De server leest het bestand bij elke vraag opnieuw.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v7",
+  "text": "Vindt hij niets, dan zegt hij dat ook, zodat het model niets bij verzint.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v8",
+  "text": "Het bestand blijft thuis.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%"
+ },
+ {
+  "id": "v9",
+  "text": "Wat de tool teruggeeft, gaat wel naar de cloud.",
+  "voice": "nl-NL-MaartenNeural",
+  "rate": "-2%",
+  "say": "Wat de tool teruggeeft, gaat wel naar de klaud."
+ }
+]

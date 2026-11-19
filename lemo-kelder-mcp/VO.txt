@@ -1,0 +1,9 @@
+Mijn kelderlijst staat op mijn laptop, en die wil ik nergens uploaden.
+Het taalmodel draait in een datacenter, dus die kan er niet zomaar bij.
+Daartussen staat een MCP-server van honderd regels, op mijn eigen machine.
+Drie tools, alleen lezen: alles geven, zoeken en tellen per stijl.
+In de toolbeschrijving staat dat het model eerst moet kijken.
+De server leest het bestand bij elke vraag opnieuw.
+Vindt hij niets, dan zegt hij dat ook, zodat het model niets bij verzint.
+Het bestand blijft thuis.
+Wat de tool teruggeeft, gaat wel naar de cloud.

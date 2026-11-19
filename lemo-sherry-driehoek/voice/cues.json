@@ -1,0 +1,65 @@
+[
+ {
+  "id": "v1",
+  "t0": 0.4,
+  "t1": 3.47,
+  "vo_end": 2.797,
+  "text": "Deze witte grond maakt sherry mogelijk."
+ },
+ {
+  "id": "v2",
+  "t0": 3.55,
+  "t1": 8.88,
+  "vo_end": 8.209,
+  "text": "Albariza: kalkrijke mergel die water vasthoudt, ook in de droge zomer."
+ },
+ {
+  "id": "v3",
+  "t0": 8.96,
+  "t1": 13.16,
+  "vo_end": 12.498,
+  "text": "Die grond ligt tussen Jerez, Sanlúcar en El Puerto."
+ },
+ {
+  "id": "v4",
+  "t0": 13.24,
+  "t1": 17.99,
+  "vo_end": 17.314,
+  "text": "Uit het westen waait de poniente, koel en vochtig, van de oceaan."
+ },
+ {
+  "id": "v5",
+  "t0": 18.07,
+  "t1": 22.84,
+  "vo_end": 22.17,
+  "text": "Die vochtige lucht helpt de flor, de gistlaag op fino en manzanilla."
+ },
+ {
+  "id": "v6",
+  "t0": 22.92,
+  "t1": 28.37,
+  "vo_end": 26.9,
+  "text": "In Sanlúcar, aan de riviermonding, blijft die laag het hele jaar dik."
+ },
+ {
+  "id": "v7",
+  "t0": 28.45,
+  "t1": 31.66,
+  "vo_end": 30.991,
+  "text": "Alleen in Sanlúcar mag manzanilla rijpen."
+ },
+ {
+  "id": "v8",
+  "t0": 31.74,
+  "t1": 36.62,
+  "vo_end": 34.752,
+  "text": "Uit het oosten komt de levante: heet en droog."
+ },
+ {
+  "id": "v9",
+  "t0": 36.7,
+  "t1": 39.721,
+  "vo_end": 38.721,
+  "text": "Twee winden, één witte bodem."
+ }
+]

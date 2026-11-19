@@ -1,0 +1,35 @@
+1
+00:00:00,500 --> 00:00:05,520
+Mijn kelderlijst staat op mijn laptop, en die wil ik nergens uploaden.
+
+2
+00:00:05,600 --> 00:00:11,120
+Het taalmodel draait in een datacenter, dus die kan er niet zomaar bij.
+
+3
+00:00:11,200 --> 00:00:16,720
+Daartussen staat een MCP-server van honderd regels, op mijn eigen machine.
+
+4
+00:00:16,800 --> 00:00:22,320
+Drie tools, alleen lezen: alles geven, zoeken en tellen per stijl.
+
+5
+00:00:22,400 --> 00:00:28,320
+In de toolbeschrijving staat dat het model eerst moet kijken.
+
+6
+00:00:28,400 --> 00:00:33,920
+De server leest het bestand bij elke vraag opnieuw.
+
+7
+00:00:34,000 --> 00:00:39,120
+Vindt hij niets, dan zegt hij dat ook, zodat het model niets bij verzint.
+
+8
+00:00:39,200 --> 00:00:41,720
+Het bestand blijft thuis.
+
+9
+00:00:41,800 --> 00:00:45,633
+Wat de tool teruggeeft, gaat wel naar de cloud.

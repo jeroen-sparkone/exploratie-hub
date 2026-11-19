@@ -1,0 +1,39 @@
+Sherry-driehoek · 3D Map Explainer, 9:16 · derde-partijmateriaal en bronnen
+
+## Kaartdata en beeld (door build.sh opgehaald naar raw/ en verwerkt tot assets/)
+- Hoogte en bathymetrie: AWS Terrain Tiles (Mapzen / Tilezen "terrarium" PNG), https://registry.opendata.aws/terrain-tiles/
+  zoom 11 voor de driehoek (tools/fetch.py), zoom 8 voor de regio (tools/fetch_wide.py). Bronnen o.a. SRTM (publiek domein),
+  GMTED, ETOPO1 en GEBCO; naamsvermelding zoals de terrain-tiles-documentatie vraagt.
+- Beeld: Sentinel-2 cloudless 2016, https://s2maps.eu, door EOX IT Services GmbH (Contains modified Copernicus Sentinel data
+  2016 & 2017), CC BY 4.0. Laag s2cloudless_3857: zoom 12 (driehoek), zoom 9 (regio). Latere releases zijn CC BY-NC-SA en
+  zijn niet gebruikt.
+- In beeld staat de hele film een bronregel rechtsboven: hoogte AWS Terrain Tiles, beeld Sentinel-2 cloudless 2016 by EOX
+  (CC BY 4.0), hoogte ×4, windlijnen schematisch.
+- Elke download (URL en datum) staat in raw/manifest.jsonl.
+- Windlijnen zijn schematisch; stadsposities zijn de coördinaten van de stadscentra.
+
+## Feiten
+- Elk getal en elke bewering staat met bron in FACTS.md (Consejo Regulador, Memoria 2025; Pliego DO Manzanilla-Sanlúcar;
+  gids sherry-driehoek-albariza op vinovonk.com). Afstanden zijn berekend uit de coördinaten.
+
+## Stem
+- Microsoft Edge online text-to-speech via edge-tts (MIT), stem nl-NL-MaartenNeural. Gebruik van de stem valt onder de
+  voorwaarden van Microsoft; toets die vóór commercieel gebruik. Spraakcheck: faster-whisper small (MIT).
+
+## Muzieksamples (CC0; vermelding niet verplicht, met dank)
+- VS Chamber Orchestra: Community Edition (Versilian Studios): contrabas (arco, pizzicato), cello's (arco, spiccato), hoorn.
+- Versilian Community Sample Library (Versilian Studios): hand chimes, gestreken vibrafoon, glockenspiel, harp, framedrum.
+- Ambience, foley en de sinuspedaal zijn procedureel (core/audio/sfx.py en mix.py).
+
+## Fonts (SIL Open Font License 1.1, door tools/fonts.py opgehaald)
+- Barlow Condensed Regular / Medium / SemiBold: The Barlow Project Authors, https://github.com/google/fonts/tree/main/ofl/barlowcondensed
+- Noto Serif 900: Google, via de Google Fonts CSS API.
+
+## Code
+- three.js r170 (MIT) uit de node_modules van de library. post.js en de lint-shader in index.html komen uit de
+  Lemo-Opuscar-stijl 3D Map Explainer van Lemomo (LemoLab), MIT License (~/lemo-opuscar/LICENSES/MIT.txt).
+  De stijlprompt (STYLE.md) valt onder CC BY-NC 4.0 met de aanvullende toestemming in ~/lemo-opuscar/LICENSE;
+  de film zelf is van de maker.
+
+## Beeld, modellen
+- Geen foto's behalve de satellietmozaïeken hierboven, geen 3D-modellen, geen AI-gegenereerde beelden.
