@@ -7,3 +7,6 @@ cutroom-test/
 lemo-*/out/
 lemo-*/raw/
 lemo-*/*.mp4
+
+# Blotato contentskills: kloon van derden, eigen git, buiten versiebeheer
+contentskills/
