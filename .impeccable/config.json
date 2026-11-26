@@ -22,6 +22,15 @@
         ],
         "createdAt": "2026-11-18T16:26:23.087Z",
         "reason": "VinoVonk brand token bg #fff8f0 uit vinovonk-astro/src/styles/tokens.css en _shared/brand/style-guide.md; kiesblad volgt de huisstijl"
+      },
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "lemo-kerstfles/index.html"
+        ],
+        "createdAt": "2026-11-26T19:25:18.799Z",
+        "reason": "agent: #f3e8d2 is the VinoVonk house cream from _shared/brand/style-guide.md, same as lemo-portstijlen"
       }
     ]
   }
