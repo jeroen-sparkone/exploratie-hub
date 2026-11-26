@@ -1,0 +1,20 @@
+Soorten port · VinoVonk-illustratiestijl, 9:16, zonder stem · bronnen en materiaal
+
+## Feiten
+- Elk getal en elke bewering staat met bron in FACTS.md (IVDP, via de gids soorten-port op vinovonk.com).
+- De kleuren van de glazen tonen de richting (robijn naar amber), geen kleurmeting.
+
+## Beeld
+- Alles getekend in code (film.js, Canvas 2D). Helpers en eindslide uit ../lemo-sherry-illustratie.
+- Geen foto's, geen 3D-modellen, geen AI-gegenereerde beelden.
+
+## Geluid
+- Geen stem.
+- Muzieksamples (CC0): VS Chamber Orchestra: Community Edition en Versilian Community Sample Library (Versilian Studios).
+- Wind, foley en de grondtoon zijn procedureel (core/audio/sfx.py en mix.py, afgeleid van ../lemo-douro/mix.py).
+
+## Fonts (SIL Open Font License 1.1)
+- Noto Serif 900: Google. Space Grotesk 500/700: Florian Karsten. Caveat: Impallari Type.
+
+## Code
+- Render- en mixgereedschap uit Lemo-Opuscar (LemoLab), MIT License (~/lemo-opuscar/LICENSES/MIT.txt).

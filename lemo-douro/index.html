@@ -1,0 +1,460 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Douro · 3D Map Explainer</title>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<style>
+@font-face{font-family:Barlow;src:url(fonts/BarlowCondensed-Regular.ttf);font-weight:400}
+@font-face{font-family:Barlow;src:url(fonts/BarlowCondensed-Medium.ttf);font-weight:500}
+@font-face{font-family:Barlow;src:url(fonts/BarlowCondensed-SemiBold.ttf);font-weight:600}
+@font-face{font-family:NotoSerif;src:url(fonts/NotoSerif-900.woff2) format('woff2');font-weight:900}
+html,body{margin:0;background:#05080c;overflow:hidden}
+canvas{position:absolute;left:0;top:0}
+</style></head>
+<body>
+<script type="module">
+// Douro, 9:16, zonder stem. Eén tijdlijn (shotlijst in TREATMENT.md), 96 bpm, één maat = 2,5 s. Taal: ?lang=en.
+//   S1 0–4.2 helling bij Pinhão · S2 4.2–10 klim naar de kust, 89 km · S3 10–17 regen west tegen oost
+//   S4 17–26 drie subregio's · S5 26–31 schist bij Pinhão · S6 31–38 klim, 1756, hectares · S7 38–42 eindkaart
+import * as THREE from 'three';
+import { makePost } from './post.js';
+import { clamp, lerp, seg, ss, eo, eio, track, mulberry } from '/core/lib.js';
+
+const Wd = innerWidth || 1080, Ht = innerHeight || 1920, Q = new URLSearchParams(location.search);
+const FULL = 43.4;
+const T0 = +(Q.get('t0') || 0), T1 = Q.has('t1') ? +Q.get('t1') : FULL;
+
+// ---------- data ----------
+const J = u => fetch(u).then(r => r.json()), B = u => fetch(u).then(r => r.arrayBuffer());
+const [meta, wmeta, hraw, wraw, RIVER, IBERIA] = await Promise.all([J('assets/meta.json'), J('assets/wide_meta.json'), B('assets/height.bin'), B('assets/wide_height.bin'), J('assets/douro.json'), J('assets/iberia.json')]);
+const hbuf = new Float32Array(hraw), wbuf = new Float32Array(wraw);
+const EX = 2.0;                                     // land ×2 (zelfde waarde als tools/bake.py)
+const { GW, GH, km_px, width_km: WK, height_km: HK } = meta;
+const [MX0, MY0] = meta.merc;
+const D2R = Math.PI / 180;
+
+function merc(lon, lat) { const n = 2 ** meta.z * 256; return [(lon + 180) / 360 * n, (1 - Math.asinh(Math.tan(lat * D2R)) / Math.PI) / 2 * n]; }
+function xz(lon, lat) { const [mx, my] = merc(lon, lat); return [(mx - MX0) * km_px - WK / 2, (my - MY0) * km_px - HK / 2]; }
+const [WX0, WZ0] = xz(wmeta.bbox[0], wmeta.bbox[3]), [WX1, WZ1] = xz(wmeta.bbox[2], wmeta.bbox[1]);
+function bil(buf, w, h, gx, gz) {
+  const x0 = Math.max(0, Math.min(w - 2, Math.floor(gx))), z0 = Math.max(0, Math.min(h - 2, Math.floor(gz)));
+  const fx = clamp(gx - x0), fz = clamp(gz - z0);
+  const a = buf[z0 * w + x0], b = buf[z0 * w + x0 + 1], c = buf[(z0 + 1) * w + x0], d = buf[(z0 + 1) * w + x0 + 1];
+  return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
+}
+function hAt(X, Z) {
+  if (Math.abs(X) < WK / 2 && Math.abs(Z) < HK / 2) return bil(hbuf, GW, GH, (X + WK / 2) / WK * (GW - 1), (Z + HK / 2) / HK * (GH - 1));
+  return bil(wbuf, wmeta.GW, wmeta.GH, (X - WX0) / (WX1 - WX0) * (wmeta.GW - 1), (Z - WZ0) / (WZ1 - WZ0) * (wmeta.GH - 1));
+}
+const yOf = h => Math.max(h, 0) / 1000 * EX;
+function geo(lon, lat, lift = 0) { const [X, Z] = xz(lon, lat); return new THREE.Vector3(X, yOf(hAt(X, Z)) + lift, Z); }
+function hav(a, b) { const R = 6371, p1 = a[1] * D2R, p2 = b[1] * D2R, dp = p2 - p1, dl = (b[0] - a[0]) * D2R;
+  return 2 * R * Math.asin(Math.sqrt(Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2)); }
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(2); renderer.setSize(Wd, Ht);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const HAZE = new THREE.Color(0x65707a);
+scene.background = HAZE.clone();
+scene.fog = new THREE.Fog(HAZE, 300, 900);
+
+const tl = new THREE.TextureLoader();
+const load = u => new Promise((r, e) => tl.load(u, r, undefined, e));
+const [albedo, waterTex, shadowTex, walbedo, wwaterTex, wshadowTex] = await Promise.all(
+  ['assets/albedo.jpg', 'assets/water.png', 'assets/shadow.png', 'assets/wide_albedo.jpg', 'assets/wide_water.png', 'assets/wide_shadow.png'].map(load));
+for (const t of [albedo, walbedo]) { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16; }
+for (const t of [shadowTex, wshadowTex]) t.anisotropy = 8;
+
+function roughFrom(tex) {
+  const c = document.createElement('canvas'); c.width = tex.image.width; c.height = tex.image.height;
+  const g = c.getContext('2d'); g.drawImage(tex.image, 0, 0); const id = g.getImageData(0, 0, c.width, c.height);
+  for (let i = 0; i < id.data.length; i += 4) { const w = id.data[i] / 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = 245 * (1 - w) + 185 * w; }
+  g.putImageData(id, 0, 0); return new THREE.CanvasTexture(c);
+}
+// schaduw en detail: dichtbij de gebakken schaduw vol, ver weg zacht en het detailvak op het brede beeld (geen naad)
+const SHAMT = { value: .88 }, FARMIX = { value: 0 };
+const LIGHT_CHUNK = THREE.ShaderChunk.lights_fragment_begin.replaceAll('RE_Direct( directLight,', 'directLight.color *= mix( 1.0, texture2D( tShadow, vMapUv ).r, shAmt );\n\t\tRE_Direct( directLight,');
+function terrainMat(map, water, shadow, clipRect, blendWide = false) {
+  const m = new THREE.MeshStandardMaterial({ map, roughnessMap: roughFrom(water), roughness: 1, metalness: 0 });
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, { tShadow: { value: shadow }, clipR: { value: clipRect || new THREE.Vector4(1, 1, -1, -1) },
+      tWide: { value: walbedo }, shAmt: SHAMT, farMix: FARMIX, wBox: { value: new THREE.Vector4(WX0, WZ0, WX1, WZ1) }, dBox: { value: new THREE.Vector2(WK / 2, HK / 2) }, bw: { value: blendWide ? 1 : 0 } });
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      if (bw > .5) { vec2 uw = vec2((vWp.x - wBox.x) / (wBox.z - wBox.x), 1. - (vWp.z - wBox.y) / (wBox.w - wBox.y));
+        float ed = min(dBox.x - abs(vWp.x), dBox.y - abs(vWp.z)); float f = max(1. - smoothstep(.0, 4.5, ed), farMix);
+        vec4 wc = texture2D(tWide, uw); diffuseColor.rgb = mix(diffuseColor.rgb, wc.rgb, f); }`);
+    sh.fragmentShader = 'uniform sampler2D tWide; uniform vec4 wBox; uniform vec2 dBox; uniform float bw, shAmt, farMix;\n' + sh.fragmentShader;
+    sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform sampler2D tShadow; uniform vec4 clipR; varying vec3 vWp;\n' + sh.fragmentShader
+      .replace('void main() {', 'void main() {\n if (vWp.x > clipR.x && vWp.x < clipR.z && vWp.z > clipR.y && vWp.z < clipR.w) discard;')
+      .replace('#include <lights_fragment_begin>', LIGHT_CHUNK);
+  };
+  return m;
+}
+function terrainMesh(w, h, gw, gh, buf, mat) {
+  const g = new THREE.PlaneGeometry(w, h, gw - 1, gh - 1); g.rotateX(-Math.PI / 2);
+  const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, yOf(buf[i]));
+  g.computeVertexNormals(); return new THREE.Mesh(g, mat);
+}
+const DETAIL = terrainMesh(WK, HK, GW, GH, hbuf, terrainMat(albedo, waterTex, shadowTex, null, true)); scene.add(DETAIL);
+const CLIP_ON = new THREE.Vector4(-WK / 2 + 1.2, -HK / 2 + 1.2, WK / 2 - 1.2, HK / 2 - 1.2), clip = CLIP_ON.clone();
+{
+  const wm = terrainMesh(WX1 - WX0, WZ1 - WZ0, wmeta.GW, wmeta.GH, wbuf, terrainMat(walbedo, wwaterTex, wshadowTex, clip));
+  wm.position.set((WX0 + WX1) / 2, -.03, (WZ0 + WZ1) / 2); scene.add(wm);
+}
+const sun = new THREE.DirectionalLight(0xffe2b8, 3.1);
+sun.position.set(-150, 62, -70); sun.target.position.set(0, 0, 0);
+scene.add(sun, sun.target, new THREE.HemisphereLight(0x9fb6c8, 0x4a3420, 0.55));
+
+// ---------- gloeiende linten (shader uit de stijl-demo, zonder doorsnede en kielzog) ----------
+const FOV = 40;
+const camera = new THREE.PerspectiveCamera(FOV, Wd / Ht, .2, 900);
+const PIXK = 2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)) / Ht;
+const RIB_V = `attribute float aSide; attribute vec3 aNorm; attribute float aAlong;
+  uniform float wW, pxW, pixK; varying float vSide, vAlong;
+  void main(){ vec4 wp = modelMatrix * vec4(position, 1.); float pw = length(cameraPosition - wp.xyz) * pixK;
+    float hw = max(wW * .5, pxW * .5 * pw); wp.xyz += aNorm * aSide * hw; vSide = aSide; vAlong = aAlong;
+    gl_Position = projectionMatrix * viewMatrix * wp; }`;
+const RIB_F = `varying float vSide, vAlong; uniform vec3 col; uniform float k, inten, revA, revB, soft, head, headAmt,
+  flowSp, flowLen, flowAmt, flowPh, base, L, endFade;
+  void main(){
+    float d = vSide; float g = exp(-d * d * k);
+    float vis = smoothstep(revA - soft, revA, vAlong) * (1. - smoothstep(revB, revB + soft, vAlong));
+    if (vis <= 0.) discard;
+    float e = smoothstep(0., endFade, vAlong) * smoothstep(L, L - endFade, vAlong);
+    float a = base;
+    if (flowAmt > 0.) { float f = fract((vAlong - flowPh) / flowSp); a += flowAmt * smoothstep(1. - flowLen / flowSp, 1., f) * smoothstep(1., .985, f); }
+    a += headAmt * exp(-pow((vAlong - head) / (2.5 * max(1., soft / 2.)), 2.));
+    gl_FragColor = vec4(col * g * a * inten * vis * e, 1.); }`;
+function ribbon(pts, o) {
+  const pos = [], side = [], nrm = [], al = [], idx = []; let L = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const t = new THREE.Vector3().subVectors(b, a); const n = new THREE.Vector3().crossVectors(t, new THREE.Vector3(0, 1, 0)).normalize();
+    if (i) L += pts[i].distanceTo(pts[i - 1]);
+    const p = pts[i];
+    for (const s of [1, -1]) { pos.push(p.x, p.y, p.z); side.push(s); nrm.push(n.x, n.y, n.z); al.push(L); }
+    if (i) { const q = 2 * i; idx.push(q - 2, q - 1, q, q - 1, q + 1, q); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aSide', new THREE.Float32BufferAttribute(side, 1));
+  g.setAttribute('aNorm', new THREE.Float32BufferAttribute(nrm, 3)); g.setAttribute('aAlong', new THREE.Float32BufferAttribute(al, 1)); g.setIndex(idx);
+  const U = { col: new THREE.Color(o.col ?? 0xffa63d), k: o.k ?? 3, inten: 0, wW: o.wW ?? 0, pxW: o.pxW ?? 2, pixK: PIXK, revA: 0, revB: 1e9, soft: o.soft ?? 2,
+    head: -1e6, headAmt: 0, flowSp: o.flowSp ?? 30, flowLen: o.flowLen ?? 6, flowAmt: o.flowAmt ?? 0, flowPh: 0, base: o.base ?? 1, L, endFade: o.endFade ?? .01 };
+  const uniforms = {}; for (const k in U) uniforms[k] = { value: U[k] };
+  const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms, vertexShader: RIB_V, fragmentShader: RIB_F, side: THREE.DoubleSide, transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending, toneMapped: false }));
+  m.renderOrder = o.order ?? 2; m.frustumCulled = false; scene.add(m);
+  m.L = L; m.u = uniforms; return m;
+}
+const smooth = (pts, n) => new THREE.CatmullRomCurve3(pts, false, 'centripetal').getSpacedPoints(n);
+const rv = (r, a) => { for (const k in a) r.u[k].value = a[k]; };
+const AMB = 0xffa63d, AMB2 = 0xffc36b, TEAL = 0x2fa3b0, TEAL2 = 0x8fd6de, MEAS = 0xf6eee0;
+// ---------- taal en tekst ----------
+const LANG = Q.get('lang') === 'en' ? 'en' : 'nl';
+const IG = Q.get('cta') === 'ig' && LANG === 'nl', KEY = 'PORTGIDS';   // IG-variant: keyword-CTA (Blotato DM-automation, post-specifiek)
+const L = (nl, en) => LANG === 'en' ? en : nl;
+const N = s => LANG === 'en' ? s.replaceAll('.', ',') : s;            // 43.808 → 43,808
+
+// ---------- plaatsen (OpenStreetMap/Nominatim) en de rivier (OpenStreetMap, ODbL) ----------
+const P = {
+  PORTO: [-8.6126, 41.1407], PINHAO: [-7.5460, 41.1911], REGUA: [-7.7876, 41.1637], FONTES: [-7.8154, 41.2304],
+  BARCA: [-6.9410, 41.0268], VALEIRA: [-7.3679, 41.1580], BARQUEIROS: [-7.8875, 41.1405] };
+// het lint volgt de hoogste van detail- en breed terrein: ver weg is alleen het brede terrein zichtbaar
+const hWide = (X, Z) => bil(wbuf, wmeta.GW, wmeta.GH, (X - WX0) / (WX1 - WX0) * (wmeta.GW - 1), (Z - WZ0) / (WZ1 - WZ0) * (wmeta.GH - 1));
+const geoR = (lon, lat, lift) => { const [X, Z] = xz(lon, lat); return new THREE.Vector3(X, yOf(Math.max(hAt(X, Z), hWide(X, Z))) + lift, Z); };
+const riverPts = (lo0, lo1, lift = .09) => smooth(RIVER.filter(([lo]) => lo >= lo0 && lo <= lo1).map(([lo, la]) => geoR(lo, la, lift)), 1400);
+const RIV = 0x8fd6de, RIV2 = 0xcfeff2;
+const pair = (pts, col, col2, w = 1) => ({ glow: ribbon(pts, { pxW: 10 * w, k: 3, base: .22, col, order: 2 }), core: ribbon(pts, { pxW: 2.6 * w, k: 1.2, base: 1.1, col: col2, order: 3 }) });
+const RIVER_W = pair(riverPts(-8.70, P.PINHAO[0]), RIV, RIV2);          // monding → Pinhão (S2)
+const RIVER_E = pair(riverPts(P.PINHAO[0], -6.93), RIV, RIV2);          // Pinhão → Barca d'Alva (S3)
+
+// de maat Porto–Pinhão, hemelsbreed
+const KM = hav(P.PORTO, P.PINHAO);
+const MEASURE = (() => { const pts = []; for (let k = 0; k <= 160; k++) { const f = k / 160; pts.push(geo(lerp(P.PORTO[0], P.PINHAO[0], f), lerp(P.PORTO[1], P.PINHAO[1], f), .9 + Math.sin(f * Math.PI) * 2.5)); }
+  return pair(smooth(pts, 400), MEAS, MEAS, .8); })();
+
+// drie subregio's, schematisch: banden langs de rivier, gescheiden bij de Corgo (Régua) en het Cachão da Valeira
+const SUB = [
+  { lo0: P.BARQUEIROS[0], lo1: P.REGUA[0], col: 0x6fc7d4, col2: 0xcfeff2, t: 17.6, name: 'BAIXO CORGO', ha: '13.204', at: [-7.84, 41.18] },
+  { lo0: P.REGUA[0], lo1: P.VALEIRA[0], col: 0xffa63d, col2: 0xffd08a, t: 20.5, name: 'CIMA CORGO', ha: '20.427', at: [-7.58, 41.20] },
+  { lo0: P.VALEIRA[0], lo1: -6.93, col: 0xe2553b, col2: 0xffb199, t: 23.4, name: 'DOURO SUPERIOR', ha: '10.177', at: [-7.15, 41.08] }
+].map(s => ({ ...s, ...pair(riverPts(s.lo0, s.lo1, .14), s.col, s.col2, 3.2) }));
+
+// ---------- camera: één doorlopende beweging ----------
+// keys: t, [log afstand km, pitch°, yaw°, doel lon, doel lat, doelhoogte km]; yaw 0 = camera ten zuiden van het doel,
+// yaw 90 = camera ten oosten (kijkt west, de kust boven in beeld), yaw -90 = camera ten westen (kijkt stroomopwaarts)
+const CAM = track([
+  [0.0, [Math.log(3.0), 15, 0, P.PINHAO[0], 41.205, .25]],
+  [4.2, [Math.log(5.6), 21, 10, P.PINHAO[0], 41.203, .25]],
+  [6.6, [Math.log(42), 40, 70, -7.90, 41.17, 0]],
+  [9.8, [Math.log(150), 48, 90, -8.08, 41.16, 0]],
+  [12.6, [Math.log(165), 52, -55, -7.45, 41.13, 0]],
+  [16.8, [Math.log(150), 52, -86, -7.36, 41.12, 0]],
+  [17.6, [Math.log(100), 46, -82, -7.82, 41.16, 0]],
+  [21.4, [Math.log(96), 46, -80, -7.52, 41.17, 0]],
+  [25.6, [Math.log(104), 48, -84, -7.12, 41.10, 0]],
+  [28.2, [Math.log(8.5), 26, -16, -7.552, 41.202, .22]],
+  [30.8, [Math.log(6.2), 23, -28, -7.556, 41.203, .22]],
+  [34.2, [Math.log(200), 62, -90, -7.55, 41.15, 0]],
+  [38.8, [Math.log(214), 64, -85, -7.55, 41.15, 0]],
+  [43.4, [Math.log(224), 65, -81, -7.55, 41.15, 0]]]);
+function mapCam(t) {
+  const [ld, pd, yd, lo, la, h] = CAM(clamp(t, 0, FULL)); const [X, Z] = xz(lo, la), d = Math.exp(ld), p = pd * D2R, y = yd * D2R;
+  return { d, cam: new THREE.Vector3(X + Math.sin(y) * Math.cos(p) * d, h + Math.sin(p) * d, Z + Math.cos(y) * Math.cos(p) * d), tgt: new THREE.Vector3(X, h, Z) };
+}
+function setCamera(t) {
+  const { d, cam, tgt } = mapCam(t);
+  camera.position.copy(cam);
+  camera.near = Math.max(.05, d * .03); camera.far = d * 6 + 400; camera.lookAt(tgt); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+  scene.fog.near = d * .95; scene.fog.far = d * 2.3 + 30;
+  return d;
+}
+
+// ---------- post ----------
+const post = makePost(renderer, scene, camera, Wd, Ht, { ssaa: 2, ao: false });
+post.dof.maxCoc = 7; post.bloom.strength = .55; post.bloom.radius = .55; post.bloom.threshold = .95;
+const VU = post.vig.uniforms; VU.amt.value = .42; VU.warm.value = .25; VU.sat.value = .92; VU.contrast.value = .12;
+
+// ---------- overlay ----------
+const ov = document.createElement('canvas'); ov.width = Wd * 2; ov.height = Ht * 2; ov.style.width = Wd + 'px'; ov.style.height = Ht + 'px'; document.body.appendChild(ov);
+const g = ov.getContext('2d');
+await Promise.all(['400 20px Barlow', '500 20px Barlow', '600 20px Barlow', '900 20px NotoSerif'].map(f => document.fonts.load(f, 'PINHÃO 1756')));
+const scr = v => { const p = v.clone().project(camera); return [(p.x + 1) / 2 * Wd, (1 - p.y) / 2 * Ht, p.z]; };
+const C = { land: '#2b2119', sea: '#bcdbe6', light: '#f6eee0', amber: '#ffc36b', amberSoft: 'rgba(255,214,150,.95)', teal: '#9fe3ea', dim: 'rgba(240,232,216,.7)' };
+let TX = [];
+function txt(s, x, y, o) {
+  g.save(); g.font = `${o.w || 500} ${o.size}px ${o.f || 'Barlow'}`; g.letterSpacing = (o.sp || 0) + 'px';
+  g.textAlign = o.align || 'center'; g.textBaseline = o.base || 'middle'; g.globalAlpha = clamp(o.a ?? 1); g.fillStyle = o.col || C.light;
+  g.fillText(s, x, y); const w = g.measureText(s).width;
+  const x0 = o.align === 'left' ? x : o.align === 'right' ? x - w : x - w / 2;
+  if ((o.a ?? 1) > .5 && !o.nobox) TX.push({ id: o.id || s, text: s, x0, y0: y - o.size * .6, x1: x0 + w, y1: y + o.size * .6 });
+  g.restore(); return w;
+}
+const tw = (s, size, w = 500, sp = 0, f = 'Barlow') => { g.save(); g.font = `${w} ${size}px ${f}`; g.letterSpacing = sp + 'px'; const r = g.measureText(s).width; g.restore(); return r; };
+function line(pts, col, w = 1.4, a = 1) { g.save(); g.globalAlpha = a; g.strokeStyle = col; g.lineWidth = w; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); g.restore(); }
+function dot(x, y, r, col, a = 1) { g.save(); g.globalAlpha = a; g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.restore(); }
+function rings(x, y, t0, t, a, col = C.amber, R = 46) { const r = seg(t, t0, t0 + 1.6); for (const k of [0, .33, .66]) { const q = (r * 1.4 + k) % 1; if (r <= 0) break;
+  g.save(); g.globalAlpha = a * (1 - q) * .85; g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 7 + R * q, 0, 7); g.stroke(); g.restore(); } }
+
+const TOP_SAFE = 230, SUB_Y = Ht - 470;
+const fadeIO = (t, a0, a1, i = .5, o = .5) => ss(seg(t, a0, a0 + i)) * (1 - ss(seg(t, a1 - o, a1)));
+const onScreen = (x, y, w = 0) => Math.min(x - w / 2 - 40, Wd - 40 - x - w / 2, y - TOP_SAFE, SUB_Y - 80 - y);
+
+const LABELS = [
+  [-9.05, 41.30, L('ATLANTISCHE OCEAAN', 'ATLANTIC OCEAN'), C.sea, 7.2, 12.0],
+  [-6.80, 41.25, L('SPANJE', 'SPAIN'), C.land, 12.8, 16.6]];
+function mapLabels(t) {
+  for (const [lo, la, s, col, a0, a1] of LABELS) {
+    let a = fadeIO(t, a0, a1, .6); if (a <= .01) continue;
+    const [x, y, z] = scr(geo(lo, la, .3)); if (z > 1) continue;
+    const w = tw(s, 32, 600, 8); a *= ss(seg(onScreen(x, y, w), 0, 60)); if (a <= .01) continue;
+    txt(s, x, y, { size: 32, w: 600, sp: 8, col, a: a * .9, id: 'L' + s });
+  }
+}
+
+// een pin met naam en onderregel
+function pin(ll, name, sub, t, t0, t1, o = {}) {
+  const a = fadeIO(t, t0, t1, .4, .5); if (a <= 0) return;
+  const [x, y, z] = scr(geo(...ll, .05)); if (z > 1) return;
+  rings(x, y, t0, t, a, o.col || C.amber, o.R || 46); dot(x, y, 6, o.col || C.amber, a);
+  const left = o.left, nw = Math.max(tw(name, o.size || 40, 600, 5), tw(sub || '', 24, 500, 4));
+  let lx = x + (left ? -20 : 20); lx = left ? Math.max(lx, 40 + nw) : Math.min(lx, Wd - 40 - nw);
+  const ly = clamp(y - 22, TOP_SAFE + 30, SUB_Y - 140);
+  txt(name, lx, ly, { size: o.size || 40, w: 600, sp: 5, align: left ? 'right' : 'left', col: C.light, a, id: 'p' + name });
+  if (sub) txt(sub, lx, ly + 36, { size: 24, w: 600, sp: 4, align: left ? 'right' : 'left', col: o.subCol || C.dim, a: a * ss(seg(t, t0 + .25, t0 + .7)), id: 'ps' + name });
+}
+
+// S1/S5: het woord op de grond
+function groundWord(t, t0, t1, big, sub, ll) {
+  const a = fadeIO(t, t0, t1, .6, .7); if (a <= 0) return;
+  const [x, y] = scr(geo(...ll, .03));
+  const lx = clamp(x, 300, Wd - 300), ly = clamp(y - 240, TOP_SAFE + (t < 4.3 ? 520 : 110), SUB_Y - 300);   // onder de hook
+  dot(x, y, 5, C.light, a); line([[x, y - 6], [lx, ly + 80]], 'rgba(246,238,224,.8)', 1.4, a * ss(seg(t, t0 + .2, t0 + .8)));
+  txt(big, lx, ly, { size: 104, w: 600, sp: 14, col: C.light, a, id: 'gw' + big });
+  txt(sub, lx, ly + 66, { size: 28, w: 600, sp: 6, col: C.amberSoft, a: a * ss(seg(t, t0 + .2, t0 + .6)), id: 'gws' + big });
+}
+
+// S2: de maat
+function measure(t) {
+  const a = fadeIO(t, 7.4, 10.9, .5, .6); if (a <= 0) return;
+  const mid = [lerp(P.PORTO[0], P.PINHAO[0], .5), lerp(P.PORTO[1], P.PINHAO[1], .5)];
+  const [x, y, z] = scr(geo(...mid, 3.6)); if (z > 1) return;
+  const X = clamp(x, 200, Wd - 200), Y = clamp(y, TOP_SAFE + 60, SUB_Y - 160);
+  txt(Math.round(KM) + ' KM', X, Y, { size: 64, w: 600, sp: 4, col: C.light, a, id: 'km' });
+  txt(L('HEMELSBREED', 'AS THE CROW FLIES'), X, Y + 44, { size: 22, w: 600, sp: 5, col: C.dim, a: a * ss(seg(t, 7.5, 8.0)), id: 'km2' });
+}
+
+// S3: regen, west tegen oost
+function rain(t) {
+  pin(P.FONTES, 'FONTES', N('1.200 MM') + L(' REGEN PER JAAR', ' RAIN A YEAR'), t, 10.6, 17.2, { col: C.teal, subCol: '#cfeff2', size: 44, left: true });
+  pin(P.BARCA, "BARCA D'ALVA", N('380 MM') + L(' REGEN PER JAAR', ' RAIN A YEAR'), t, 12.9, 17.2, { col: '#ff8a5c', subCol: '#ffc0a8', size: 44 });
+}
+
+// S4: de drie subregio's, met de hectares wijngaard
+function subregions(t) {
+  SUB.forEach((s, i) => {
+    const end = i < SUB.length - 1 ? SUB[i + 1].t + .9 : 27.0;
+    const a = fadeIO(t, s.t + .3, end, .5, .5); if (a <= 0) return;
+    const [x, y, z] = scr(geo(...s.at, 1)); if (z > 1) return;
+    const X = clamp(x, 330, Wd - 330), Y = clamp(y, TOP_SAFE + 60, SUB_Y - 160);
+    txt(s.name, X, Y, { size: 44, w: 600, sp: 6, col: C.light, a, id: 'sr' + s.name });
+    txt(N(s.ha) + L(' HA WIJNGAARD', ' HA OF VINES'), X, Y + 40, { size: 24, w: 600, sp: 4, col: C.amberSoft, a, id: 'srh' + s.name });
+  });
+}
+
+// S6: het jaartal, dan het oppervlak
+function stat(t) {
+  const X = Wd / 2, Y = TOP_SAFE + 190;
+  const a = fadeIO(t, 31.6, 35.2, .6, .5);
+  if (a > 0) {
+    txt('1756', X, Y, { size: 190, w: 900, f: 'NotoSerif', col: '#ffd08a', a, id: 'y1756' });
+    txt(L('OUDSTE AFGEBAKENDE', 'THE OLDEST DEMARCATED'), X, Y + 130, { size: 32, w: 600, sp: 5, col: C.light, a, id: 'y2' });
+    txt(L('WIJNREGIO TER WERELD', 'WINE REGION IN THE WORLD'), X, Y + 172, { size: 32, w: 600, sp: 5, col: C.light, a, id: 'y3' });
+  }
+  const b = fadeIO(t, 35.2, 39.0, .6, .5);
+  if (b > 0) {
+    txt(N('43.808'), X, Y, { size: 160, w: 600, sp: 2, col: '#ffd08a', a: b, id: 'ha' });
+    txt(L('HECTARE WIJNGAARD', 'HECTARES OF VINES'), X, Y + 110, { size: 32, w: 600, sp: 5, col: C.light, a: b, id: 'ha2' });
+    txt(L('18% VAN DE REGIO · ' + N('250.000') + ' HA', '18% OF THE REGION · ' + N('250.000') + ' HA'), X, Y + 152, { size: 24, w: 600, sp: 4, col: C.dim, a: b, id: 'ha3' });
+  }
+}
+
+// S2/S3: het overzichtskaartje (Natural Earth, publiek domein): waar de Douro ligt
+function locator(t) {
+  const a = fadeIO(t, 4.8, 8.1, .5, .5); if (a <= 0) return;
+  const e = eo(seg(t, 4.8, 5.5)), W0 = -10.0, E0 = .8, S0 = 35.8, N0 = 44.0, K = Math.cos(40 * D2R);
+  const CW = 680, CH = Math.round(CW * (N0 - S0) / ((E0 - W0) * K)), X0 = (Wd - CW) / 2, Y0 = TOP_SAFE + 40;
+  const pt = (lo, la) => [X0 + (lo - W0) / (E0 - W0) * CW, Y0 + (N0 - la) / (N0 - S0) * CH];
+  g.save(); g.globalAlpha = a; g.translate(X0, Y0); g.scale(.94 + .06 * e, .94 + .06 * e); g.translate(-X0, -Y0);
+  g.fillStyle = 'rgba(12,24,34,.88)'; g.fillRect(X0 - 14, Y0 - 14, CW + 28, CH + 28);
+  g.strokeStyle = 'rgba(255,195,107,.75)'; g.lineWidth = 1.5; g.strokeRect(X0 - 14, Y0 - 14, CW + 28, CH + 28);
+  g.beginPath(); g.rect(X0, Y0, CW, CH); g.clip();
+  const shape = (rings, fill, stroke) => { for (const r of rings) { g.beginPath(); r.forEach(([lo, la], i) => { const [x, y] = pt(lo, la); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = 1.2; g.stroke(); } } };
+  shape(IBERIA.FRA || [], 'rgba(90,96,100,.35)', null); shape(IBERIA.MAR || [], 'rgba(90,96,100,.35)', null);
+  shape(IBERIA.ESP || [], 'rgba(120,112,100,.55)', 'rgba(246,238,224,.35)');
+  shape(IBERIA.PRT || [], 'rgba(255,195,107,.32)', 'rgba(255,214,150,.95)');
+  // de Douro en het gebied
+  g.beginPath(); RIVER.forEach(([lo, la], i) => { const [x, y] = pt(lo, la); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+  g.strokeStyle = '#8fd6de'; g.lineWidth = 2.4; g.stroke();
+  const r = ss(seg(t, 5.4, 6.0)); const [bx0, by0] = pt(P.BARQUEIROS[0] - .12, 41.42), [bx1, by1] = pt(-6.88, 40.92);
+  g.globalAlpha = a * r; g.strokeStyle = '#ffd08a'; g.lineWidth = 2.5; g.strokeRect(bx0, by0, bx1 - bx0, by1 - by0); g.globalAlpha = a;
+  { const [qx, qy] = pt(...P.PORTO); g.fillStyle = C.amber; g.beginPath(); g.arc(qx, qy, 5, 0, 7); g.fill(); }
+  g.restore();
+  const [px, py] = pt(...P.PORTO), [dx, dy] = pt(-7.4, 41.42);
+  txt('PORTO', px - 12, py + 2, { size: 26, w: 600, sp: 3, align: 'right', col: C.light, a, id: 'locP' });
+  txt('DOURO', dx + 20, dy - 22, { size: 32, w: 600, sp: 5, col: '#ffd08a', a: a * ss(seg(t, 5.5, 6.0)), id: 'locD' });
+  const [lx, ly] = pt(-8.0, 39.3), [sx, sy] = pt(-3.8, 39.9);
+  txt('PORTUGAL', lx, ly, { size: 28, w: 600, sp: 4, col: C.light, a, id: 'locPT' });
+  txt(L('SPANJE', 'SPAIN'), sx, sy, { size: 28, w: 600, sp: 4, col: C.dim, a, id: 'locES' });
+}
+
+// S1: de hook, vanaf het eerste frame
+function hook(t) {
+  const a = 1 - ss(seg(t, 3.6, 4.2)); if (a <= 0) return;
+  const Y = TOP_SAFE + 150;
+  g.save(); const gr = g.createLinearGradient(0, TOP_SAFE - 40, 0, Y + 300); gr.addColorStop(0, 'rgba(6,10,15,.55)'); gr.addColorStop(1, 'rgba(6,10,15,0)');
+  g.globalAlpha = a; g.fillStyle = gr; g.fillRect(0, TOP_SAFE - 40, Wd, 340 + 150); g.restore();
+  g.save(); g.globalAlpha = a; g.fillStyle = '#8b0018'; g.fillRect(70, Y - 70, 10, 230); g.restore();
+  txt(L('WAAR KOMT', 'WHERE DOES'), 104, Y, { size: 96, w: 900, f: 'NotoSerif', align: 'left', col: '#fff8f0', a, id: 'h1' });
+  txt(L('PORT', 'PORT'), 104, Y + 118, { size: 96, w: 900, f: 'NotoSerif', align: 'left', col: '#ffd08a', a, id: 'h2' });
+  const pw = tw(L('PORT', 'PORT'), 96, 900, 0, 'NotoSerif');
+  txt(L('VANDAAN?', 'COME FROM?'), 104 + pw + 28, Y + 118, { size: L(88, 64), w: 900, f: 'NotoSerif', align: 'left', col: '#fff8f0', a, id: 'h3' });
+}
+
+function endCard(t) {
+  const a = ss(seg(t, 39.0, 39.6)); if (a <= 0) return;
+  const e = eo(seg(t, 39.0, 39.8));
+  g.save(); g.globalAlpha = a * .55; g.fillStyle = '#05080c'; g.fillRect(0, 0, Wd, Ht); g.restore();
+  const X = 90, Y = Ht * .34, BW = (Wd - 180) * e;
+  g.save(); g.globalAlpha = a; g.fillStyle = '#8b0018'; g.fillRect(X, Y, BW, IG ? 420 : 360); g.restore();
+  if (e > .6) {
+    const k = ss(seg(t, 39.5, 40.0));
+    txt('DOURO', X + 50, Y + 110, { size: 120, w: 900, f: 'NotoSerif', align: 'left', col: '#fff8f0', a: a * k, id: 'e1' });
+    txt(L('WELKE PORT WANNEER?', 'WHICH PORT WHEN?'), X + 52, Y + 222, { size: 40, w: 600, sp: 4, align: 'left', col: '#fff8f0', a: a * ss(seg(t, 39.8, 40.3)), id: 'e2' });
+    if (IG) { const kk = a * ss(seg(t, 40.1, 40.6)), kw = tw(KEY, 56, 900, 2, 'NotoSerif');
+      txt('REAGEER MET', X + 52, Y + 288, { size: 30, w: 600, sp: 4, align: 'left', col: '#fff8f0', a: kk, id: 'ig1' });
+      g.save(); g.globalAlpha = kk; g.fillStyle = '#C9A227'; g.fillRect(X + 40, Y + 312, kw + 30, 74); g.restore();
+      txt(KEY, X + 55, Y + 350, { size: 56, w: 900, f: 'NotoSerif', sp: 2, align: 'left', col: '#3a0010', a: kk, id: 'ig2' }); }
+    else txt(L('DE GIDS OP VINOVONK.COM', 'THE GUIDE ON VINOVONK.COM'), X + 52, Y + 290, { size: 30, w: 600, sp: 4, align: 'left', col: '#fff8f0', a: a * ss(seg(t, 40.1, 40.6)), id: 'e3' });
+  }
+  txt('@VINOVONK', Wd / 2, Y + (IG ? 500 : 450), { size: 30, w: 600, sp: 6, col: C.light, a: a * ss(seg(t, 40.4, 40.9)), id: 'e4' });
+}
+
+// de vertellende regel, links onderin als een kaartlegenda (er is geen stem)
+const CUES = [
+  { t0: 0.0, t1: 4.1, nl: 'Niet uit Porto.', en: 'Not from Porto.' },
+  { t0: 4.4, t1: 9.8, nl: 'Hij groeit hier, 89 km landinwaarts.', en: 'It grows here, 89 km inland.' },
+  { t0: 10.4, t1: 16.8, nl: 'Stroomopwaarts valt de regen weg.', en: 'Upriver, the rain runs out.' },
+  { t0: 17.4, t1: 26.2, nl: "Drie subregio's, van nat naar heet en droog.", en: 'Three subregions, from wet to hot and dry.' },
+  { t0: 26.8, t1: 31.0, nl: 'Schist, op steile hellingen. Werelderfgoed sinds 2001.', en: 'Schist on steep slopes. World Heritage since 2001.' },
+  { t0: 31.4, t1: 38.6, nl: 'Hier begint elke fles port.', en: 'This is where every bottle of port begins.' }];
+window.CUES = CUES.map(c => ({ t0: c.t0, t1: c.t1, text: c[LANG] }));
+function wrap(s, size, max) { const words = s.split(' '); const out = ['']; for (const w of words) { const tryS = out[out.length - 1] ? out[out.length - 1] + ' ' + w : w;
+  if (tw(tryS, size, 500, 1) > max && out[out.length - 1]) out.push(w); else out[out.length - 1] = tryS; } return out; }
+function legend(t) {
+  const c = CUES.find(c => t >= c.t0 - .15 && t < c.t1 + .15);
+  const first = c && c.t0 === 0;
+  g.save(); const gr = g.createLinearGradient(0, SUB_Y - 160, 0, Ht); gr.addColorStop(0, 'rgba(6,10,15,0)'); gr.addColorStop(.5, 'rgba(6,10,15,.45)'); gr.addColorStop(1, 'rgba(6,10,15,.6)');
+  g.fillStyle = gr; g.fillRect(0, SUB_Y - 160, Wd, Ht - SUB_Y + 160); g.restore();
+  if (!c || t > 39.0) return;
+  const a = (first ? 1 : ss(seg(t, c.t0 - .15, c.t0 + .15))) * (1 - ss(seg(t, c.t1 - .15, c.t1 + .15)));
+  const X = 96, Ls = wrap(c[LANG], 50, Wd - 96 - 150), Y = SUB_Y - (Ls.length - 1) * 60;
+  g.save(); g.globalAlpha = a; g.fillStyle = C.amber; g.fillRect(X - 24, Y - 30, 4, 60 + (Ls.length - 1) * 60); g.restore();
+  Ls.forEach((s, i) => txt(s, X, Y + i * 60, { size: 50, w: 500, sp: 1, align: 'left', col: C.light, a, id: 'leg' + i, nobox: true }));
+}
+function credits(t) {
+  const a = ss(seg(t, .6, 1.4)) * (1 - ss(seg(t, 38.9, 39.3)));
+  const o = { size: 15, w: 500, sp: 1.6, align: 'right', col: 'rgba(240,232,216,.6)', a, nobox: true };
+  txt(L('HOOGTE AWS TERRAIN TILES · BEELD SENTINEL-2 CLOUDLESS 2016 BY EOX (CC BY 4.0)', 'ELEVATION AWS TERRAIN TILES · IMAGERY SENTINEL-2 CLOUDLESS 2016 BY EOX (CC BY 4.0)'), Wd - 40, TOP_SAFE - 40, { ...o, id: 'cr1' });
+  txt(L("RIVIER © OPENSTREETMAP (ODBL) · GRENZEN NATURAL EARTH · HOOGTE ×2 · SUBREGIO'S SCHEMATISCH · CIJFERS IVDP", 'RIVER © OPENSTREETMAP (ODBL) · BORDERS NATURAL EARTH · HEIGHT ×2 · SUBREGIONS SCHEMATIC · FIGURES IVDP'), Wd - 40, TOP_SAFE - 16, { ...o, id: 'cr2' });
+}
+
+// ---------- het beeld op filmtijd t ----------
+function frame(t) {
+  TX = [];
+  const dist = setCamera(t);
+  g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, Wd, Ht);
+  const dimAll = 1 - ss(seg(t, 39.0, 39.8)) * .7;
+  // de rivier: van de monding naar Pinhão (S2), dan verder stroomopwaarts (S3)
+  { const k = eio(seg(t, 4.6, 8.6)); for (const r of [RIVER_W.glow, RIVER_W.core]) rv(r, { revB: k * r.L, head: k * r.L, headAmt: r === RIVER_W.core ? 1.2 * (1 - ss(seg(k, .85, 1))) : 0, inten: (t >= 4.6 ? 1 : 0) * dimAll * (1 - ss(seg(t, 17.2, 18.0)) * .55), soft: 2 }); }
+  { const k = eio(seg(t, 10.6, 14.0)); for (const r of [RIVER_E.glow, RIVER_E.core]) rv(r, { revB: k * r.L, head: k * r.L, headAmt: r === RIVER_E.core ? 1.2 * (1 - ss(seg(k, .85, 1))) : 0, inten: (t >= 10.6 ? 1 : 0) * dimAll * (1 - ss(seg(t, 17.2, 18.0)) * .55), soft: 2 }); }
+  // de maat Porto–Pinhão
+  { const k = eo(seg(t, 6.8, 8.2)), a = fadeIO(t, 6.8, 11.0, .1, .7); for (const r of [MEASURE.glow, MEASURE.core]) rv(r, { revB: k * r.L, inten: a * dimAll, soft: 1.2 }); }
+  // de subregio's
+  for (const s of SUB) { const k = eo(seg(t, s.t, s.t + 1.4)), a = (t >= s.t ? 1 : 0) * (1 - ss(seg(t, 26.0, 27.0)) + ss(seg(t, 32.0, 33.5)) * .5) * dimAll;
+    for (const r of [s.glow, s.core]) rv(r, { revB: k * r.L, head: k * r.L, headAmt: r === s.core ? 1.3 * (1 - ss(seg(k, .8, 1))) : 0, inten: a, soft: 3 }); }
+  SHAMT.value = lerp(.88, .3, ss(seg(dist, 15, 60))); FARMIX.value = ss(seg(dist, 20, 45));
+  const far = dist > 50; DETAIL.visible = !far; if (far) clip.set(1, 1, -1, -1); else clip.copy(CLIP_ON);
+  post.dof.focus = dist; post.dof.aper = dist * (t < 6 || (t > 27.5 && t < 31.5) ? 5 : 4.5);
+  post.bloom.strength = .55;
+  VU.fade.value = 1;
+  post.composer.render();
+  mapLabels(t);
+  hook(t);
+  groundWord(t, 1.4, 4.4, 'PINHÃO', 'CIMA CORGO', [-7.547, 41.200]);
+  pin(P.PORTO, 'PORTO', L('DE KUST', 'THE COAST'), t, 7.0, 10.6, { left: false });
+  measure(t); rain(t); subregions(t); locator(t);
+  groundWord(t, 27.6, 31.4, 'SCHIST', L('STEILE HELLINGEN', 'STEEP SLOPES'), [-7.551, 41.204]);
+  stat(t);
+  if (!Q.has('nosubs')) legend(t);
+  credits(t); endCard(t);
+}
+
+window.DUR = T1 - T0;
+window.render = t => frame(t + T0);
+window.TEXTS = t => { window.render(t); return TX.map(o => ({ ...o })); };
+const EVF = [
+  { t: 0, type: 'air' }, { t: 1.0, type: 'word' }, { t: 4.2, type: 'rise' }, { t: 4.6, type: 'ignite', i: 0 },
+  { t: 6.8, type: 'ignite', i: 1 }, { t: 7.0, type: 'pin', i: 0 }, { t: 10.0, type: 'whoosh' }, { t: 10.6, type: 'pin', i: 1 },
+  { t: 12.9, type: 'pin', i: 2 }, { t: 17.4, type: 'dive' },
+  ...SUB.map((s, i) => ({ t: s.t, type: 'ignite', i: 2 + i })), { t: 26.6, type: 'dive' }, { t: 27.6, type: 'word' },
+  { t: 31.0, type: 'rise' }, { t: 31.6, type: 'stat' }, { t: 35.2, type: 'stat' }, { t: 39.0, type: 'card' }];
+window.EV = EVF.map(e => ({ ...e, t: e.t - T0 })).filter(e => e.t >= 0 && e.t <= T1 - T0);
+window.render(0);
+window.READY = true;
+</script>
+</body></html>
